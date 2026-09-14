@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "nukeop",
+    "slug": "nukeop-mobile",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#FCEBED",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#FCEBED"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow nukeop to scan your media library to find audio to play.",
+          "savePhotosPermission": false,
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nukeop.mobile",
+      "infoPlist": {
+        "NSAppleMusicUsageDescription": "nukeop needs access to your music library to scan and play local songs."
+      }
+    },
+    "android": {
+      "package": "com.nukeop.mobile",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FCEBED"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fcc72aec-aac0-4020-a0e7-7188e45b4049"
+      }
+    },
+    "owner": "shibamdey69"
+  }
+}
