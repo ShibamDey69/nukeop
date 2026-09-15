@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList } from "react-native";
-import { findArtist, getAllAlbums, getAllTracks } from "../data";
+import { ARTISTS, ALBUMS, TRACKS } from "../data";
 import { TrackRow } from "../widgets/TrackRow";
 import { usePlayer } from "../player/PlayerContext";
 import { useAppNavigation } from "../navigation/NavigationContext";
@@ -8,14 +8,14 @@ import { PlayIcon } from "../icons";
 import { colors, fonts, nbShadow } from "../theme";
 
 export default function ArtistDetailScreen({ artistId }: { artistId: string }) {
-  const artist = findArtist(artistId);
+  const artist = ARTISTS.find((a) => a.id === artistId);
   const { push } = useAppNavigation();
   const { currentTrack, isPlaying, playTrack, playQueue, isLiked, toggleLike } = usePlayer();
 
   if (!artist) return null;
 
-  const albums = getAllAlbums().filter((al) => al.artistId === artistId);
-  const tracks = getAllTracks().filter((t) => t.artistId === artistId);
+  const albums = ALBUMS.filter((al) => al.artistId === artistId);
+  const tracks = TRACKS.filter((t) => t.artistId === artistId);
 
   return (
     <FlatList

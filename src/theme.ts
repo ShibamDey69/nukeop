@@ -56,25 +56,3 @@ export const levelBg: Record<string, string> = {
   WARN: "#fffbeb",
   ERROR: "#fef2f2",
 };
-
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
-export const radii = { sm: 6, md: 10 };
-export const type = {
-  h1: 20,
-  h2: 15,
-  body: 13,
-  label: 12,
-  caption: 11,
-  micro: 10,
-};
-
-export type Palette = typeof colors & { border: string; isDark: boolean };
-
-export function useTheme() {
-  return {
-    colors: { ...colors, border: colors.ink, isDark: false },
-    nbBorder,
-    nbShadow,
-    nbShadowSm,
-  };
-}

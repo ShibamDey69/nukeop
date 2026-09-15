@@ -3,6 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "build"]
+  "include": ["**/*.ts", "**/*.tsx"]
 }

@@ -1,94 +1,189 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useTheme } from '../theme';
-import { MOCK_PLAYLISTS, MOCK_TRACKS } from '../data';
-import { NeoTag } from '../components';
-import { TrackRow } from '../widgets/TrackRow';
-import { usePlayer } from '../player/PlayerContext';
+import React, { ReactNode } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import {
+  ArrowUpRightIcon,
+  ArrowRightIcon,
+  ArtistsIcon,
+  AlbumsIcon,
+  PlaylistIcon,
+  PluginsIcon,
+  PreferencesIcon,
+  WhatsNewIcon,
+  LogsIcon,
+} from "../icons";
+import { colors, fonts, nbShadow } from "../theme";
 
-export const HomeScreen: React.FC = () => {
-  const { colors, styles: globalStyles } = useTheme();
-  const { playTrack, currentTrack } = usePlayer();
+export type HomeNav =
+  | "artists"
+  | "albums"
+  | "playlists"
+  | "plugins"
+  | "preferences"
+  | "whats-new"
+  | "logs"
+  | "now-playing";
 
+interface HomeScreenProps {
+  onNavigate: (dest: HomeNav) => void;
+}
+
+interface BentoCardProps {
+  children: ReactNode;
+  onPress?: () => void;
+  style?: any;
+  span2?: boolean;
+}
+
+function BentoCard({ children, onPress, style, span2 }: BentoCardProps) {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={[globalStyles.title, styles.greeting]}>GOOD MORNING, PUNK!</Text>
-      
-      <View style={styles.section}>
-        <Text style={[globalStyles.subtitle, styles.sectionTitle]}>TOP PLAYLISTS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {MOCK_PLAYLISTS.map(playlist => (
-            <TouchableOpacity 
-              key={playlist.id} 
-              activeOpacity={0.8} 
-              style={[
-                styles.playlistCard, 
-                { backgroundColor: playlist.color, borderColor: colors.border, shadowColor: colors.border }
-              ]}
-            >
-              <Text style={[styles.playlistTitle, { color: colors.text }]}>{playlist.title}</Text>
-              <NeoTag label={`${playlist.trackCount} TRACKS`} color={colors.card} />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      disabled={!onPress}
+      style={[styles.card, nbShadow, span2 && styles.cardSpan2, style]}
+    >
+      {children}
+    </TouchableOpacity>
+  );
+}
 
-      <View style={styles.section}>
-        <Text style={[globalStyles.subtitle, styles.sectionTitle]}>JUMP BACK IN</Text>
-        {MOCK_TRACKS.map((track, index) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            index={index}
-            isPlaying={currentTrack?.id === track.id}
-            onPress={() => playTrack(track, MOCK_TRACKS)}
-          />
-        ))}
+export default function HomeScreen({ onNavigate }: HomeScreenProps) {
+  return (
+    <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 16 }}>
+      <View style={styles.grid}>
+        {/* Hero card */}
+        <BentoCard
+          span2
+          style={[styles.heroCard, { minHeight: 120 }]}
+          onPress={() => onNavigate("now-playing")}
+        >
+          <View style={styles.rowBetween}>
+            <Text style={styles.heroTitle}>Music,{"\n"}your way.</Text>
+            <ArrowUpRightIcon size={20} color={colors.white} />
+          </View>
+          <Text style={styles.heroSubtitle}>Listen. Organize. Extend.</Text>
+        </BentoCard>
+
+        {/* Artists */}
+        <BentoCard
+          style={{ backgroundColor: colors.accentLight }}
+          onPress={() => onNavigate("artists")}
+        >
+          <ArtistsIcon size={22} color={colors.ink} />
+          <View style={styles.cardBottomRow}>
+            <View>
+              <Text style={styles.cardTitle}>Artists</Text>
+              <Text style={[styles.cardSubtitle, { opacity: 0.6, color: colors.ink }]}>
+                Explore artists
+              </Text>
+            </View>
+            <ArrowRightIcon size={14} color={colors.ink} />
+          </View>
+        </BentoCard>
+
+        {/* Albums */}
+        <BentoCard onPress={() => onNavigate("albums")}>
+          <AlbumsIcon size={22} color={colors.ink} />
+          <View style={styles.cardBottomRow}>
+            <View>
+              <Text style={styles.cardTitle}>Albums</Text>
+              <Text style={styles.cardSubtitle}>Browse albums</Text>
+            </View>
+            <ArrowRightIcon size={14} color={colors.ink} />
+          </View>
+        </BentoCard>
+
+        {/* Playlists — full width */}
+        <BentoCard
+          span2
+          style={[styles.rowCard, { minHeight: 64 }]}
+          onPress={() => onNavigate("playlists")}
+        >
+          <View style={styles.rowLeft}>
+            <PlaylistIcon size={22} color={colors.ink} />
+            <View>
+              <Text style={styles.cardTitle}>Playlists</Text>
+              <Text style={styles.cardSubtitle}>Your collections</Text>
+            </View>
+          </View>
+          <ArrowUpRightIcon size={16} color={colors.ink} />
+        </BentoCard>
+
+        {/* Plugins */}
+        <BentoCard
+          style={{ backgroundColor: colors.ink }}
+          onPress={() => onNavigate("plugins")}
+        >
+          <PluginsIcon size={22} color={colors.white} />
+          <View style={styles.cardBottomRowSingle}>
+            <Text style={[styles.cardTitle, { color: colors.white }]}>Plugins</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.muted }]}>Extend nukeop</Text>
+          </View>
+        </BentoCard>
+
+        {/* Preferences */}
+        <BentoCard onPress={() => onNavigate("preferences")}>
+          <PreferencesIcon size={22} color={colors.ink} />
+          <View style={styles.cardBottomRowSingle}>
+            <Text style={styles.cardTitle}>Preferences</Text>
+            <Text style={styles.cardSubtitle}>Make it yours</Text>
+          </View>
+        </BentoCard>
+
+        {/* What's New */}
+        <BentoCard style={[styles.rowCard, { minHeight: 56 }]} onPress={() => onNavigate("whats-new")}>
+          <WhatsNewIcon size={20} color={colors.ink} />
+          <View>
+            <Text style={styles.cardTitle}>What's new</Text>
+            <Text style={styles.cardSubtitle}>Changelog & updates</Text>
+          </View>
+        </BentoCard>
+
+        {/* Logs */}
+        <BentoCard style={[styles.rowCard, { minHeight: 56 }]} onPress={() => onNavigate("logs")}>
+          <LogsIcon size={20} color={colors.ink} />
+          <View>
+            <Text style={styles.cardTitle}>Logs</Text>
+            <Text style={styles.cardSubtitle}>View logs</Text>
+          </View>
+        </BentoCard>
       </View>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  content: { flex: 1 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 12,
+    gap: 12,
   },
-  content: {
-    padding: 16,
-    paddingBottom: 40,
+  card: {
+    borderWidth: 2,
+    borderColor: colors.ink,
+    backgroundColor: colors.surface,
+    padding: 12,
+    justifyContent: "space-between",
+    width: "47%",
   },
-  greeting: {
-    marginBottom: 24,
-    fontSize: 28,
-    lineHeight: 34,
+  cardSpan2: { width: "100%" },
+  heroCard: { backgroundColor: colors.accent },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rowCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  heroTitle: {
+    fontFamily: fonts.display,
+    fontSize: 26,
+    lineHeight: 28,
+    letterSpacing: -0.8,
+    color: colors.white,
+    flexShrink: 1,
   },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    marginBottom: 12,
-    fontWeight: '900',
-  },
-  horizontalList: {
-    paddingBottom: 8,
-    gap: 16,
-  },
-  playlistCard: {
-    width: 160,
-    height: 160,
-    borderWidth: 3,
-    borderRadius: 8,
-    padding: 16,
-    justifyContent: 'space-between',
-    shadowOffset: { width: 5, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-    marginRight: 16,
-  },
-  playlistTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  }
+  heroSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.white, opacity: 0.85, marginTop: 8 },
+  cardBottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 16 },
+  cardBottomRowSingle: { marginTop: 16 },
+  cardTitle: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
+  cardSubtitle: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 2 },
 });

@@ -1,103 +1,165 @@
-import React from 'react';
-import { View, StyleSheet, SafeAreaView, Text, TouchableOpacity } from 'react-native';
-import { ThemeProvider, useTheme } from './theme';
-import { NavigationProvider, useAppNavigation } from './navigation/NavigationContext';
-import { PlayerProvider, usePlayer } from './player/PlayerContext';
-import { HomeIcon, SearchIcon, LibraryIcon, PlayIcon, PauseIcon } from './icons';
+import React, { useState } from "react";
+import { View, StyleSheet, StatusBar } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { TopBar, BottomNavigation, MiniPlayer, Tab } from "./components";
+import { ActionSheet } from "./widgets/ActionSheet";
+import { PlayerProvider, usePlayer } from "./player/PlayerContext";
+import { NavigationProvider, useAppNavigation, Route } from "./navigation/NavigationContext";
+import { ARTISTS, ALBUMS, PLAYLISTS, TRACKS } from "./data";
+import HomeScreen, { HomeNav } from "./screens/HomeScreen";
+import LibraryScreen from "./screens/LibraryScreen";
+import PluginsScreen from "./screens/PluginsScreen";
+import PreferencesScreen from "./screens/PreferencesScreen";
+import WhatsNewScreen from "./screens/WhatsNewScreen";
+import LogsScreen from "./screens/LogsScreen";
+import NowPlayingScreen from "./screens/NowPlayingScreen";
+import SearchScreen from "./screens/SearchScreen";
+import ArtistDetailScreen from "./screens/ArtistDetailScreen";
+import AlbumDetailScreen from "./screens/AlbumDetailScreen";
+import PlaylistDetailScreen from "./screens/PlaylistDetailScreen";
+import { PreferencesIcon, WhatsNewIcon, LogsIcon } from "./icons";
+import { colors } from "./theme";
 
-// Screens
-import { HomeScreen } from './screens/HomeScreen';
-import { SearchScreen } from './screens/SearchScreen';
-import { LibraryScreen } from './screens/LibraryScreen';
-import { LocalSongsScreen } from './screens/LocalSongsScreen';
-import { NowPlayingScreen } from './screens/NowPlayingScreen';
+type LibraryTab = "artists" | "albums" | "playlists";
+type PluginsTab = "store" | "installed";
 
-const AppShell = () => {
-  const { colors } = useTheme();
-  const { currentScreen, navigate } = useAppNavigation();
-  const { currentTrack, isPlaying, togglePlayPause } = usePlayer();
+function routeTitle(route: Route): string {
+  switch (route.screen) {
+    case "preferences":
+      return "Preferences";
+    case "whats-new":
+      return "What's New";
+    case "logs":
+      return "Logs";
+    case "artist":
+      return ARTISTS.find((a) => a.id === route.id)?.name ?? "Artist";
+    case "album":
+      return ALBUMS.find((a) => a.id === route.id)?.title ?? "Album";
+    case "playlist":
+      return PLAYLISTS.find((p) => p.id === route.id)?.name ?? "Playlist";
+    default:
+      return "nukeop";
+  }
+}
 
-  const isMainTab = ['Home', 'Search', 'Library'].includes(currentScreen);
+function AppShell() {
+  const [activeTab, setActiveTab] = useState<Tab>("home");
+  const [libraryTab, setLibraryTab] = useState<LibraryTab>("artists");
+  const [pluginsTab, setPluginsTab] = useState<PluginsTab>("store");
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'Home': return <HomeScreen />;
-      case 'Search': return <SearchScreen />;
-      case 'Library': return <LibraryScreen />;
-      case 'LocalSongs': return <LocalSongsScreen />;
-      case 'NowPlaying': return <NowPlayingScreen />;
-      default: return <HomeScreen />;
+  const { current, push, pop, reset } = useAppNavigation();
+  const { currentTrack, playQueue } = usePlayer();
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab);
+    reset();
+  }
+
+  function handleHomeNav(dest: HomeNav) {
+    if (dest === "artists") {
+      setActiveTab("library");
+      setLibraryTab("artists");
+      reset();
+    } else if (dest === "albums") {
+      setActiveTab("library");
+      setLibraryTab("albums");
+      reset();
+    } else if (dest === "playlists") {
+      setActiveTab("library");
+      setLibraryTab("playlists");
+      reset();
+    } else if (dest === "plugins") {
+      setActiveTab("plugins");
+      setPluginsTab("store");
+      reset();
+    } else if (dest === "now-playing") {
+      if (!currentTrack) playQueue(TRACKS, 0);
+      push({ screen: "now-playing" });
+    } else {
+      push({ screen: dest });
     }
-  };
+  }
+
+  const isNowPlaying = current?.screen === "now-playing";
+  const isSearch = current?.screen === "search";
+  const showOwnChrome = isNowPlaying || isSearch;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.content}>
-        {renderScreen()}
-      </View>
-      
-      {/* Mini Player */}
-      {currentTrack && currentScreen !== 'NowPlaying' && (
-        <TouchableOpacity 
-          activeOpacity={0.9} 
-          style={[styles.miniPlayer, { backgroundColor: colors.accent, borderColor: colors.border }]}
-          onPress={() => navigate('NowPlaying')}
-        >
-          <View style={styles.miniPlayerInfo}>
-            <Text numberOfLines={1} style={[styles.miniPlayerTitle, { color: colors.text }]}>{currentTrack.title}</Text>
-            <Text numberOfLines={1} style={[styles.miniPlayerArtist, { color: colors.text }]}>{currentTrack.artist}</Text>
-          </View>
-          <TouchableOpacity 
-            style={[styles.miniPlayBtn, { backgroundColor: colors.card, borderColor: colors.border }]} 
-            onPress={togglePlayPause}
-          >
-            {isPlaying ? <PauseIcon size={16} color={colors.text} /> : <PlayIcon size={16} color={colors.text} />}
-          </TouchableOpacity>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.appShell} edges={["top", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.ground} />
+
+      {!showOwnChrome && (
+        <TopBar
+          title={current ? routeTitle(current) : "nukeop"}
+          onBack={current ? pop : undefined}
+          onMenu={current ? undefined : () => setMenuOpen(true)}
+          onSearch={current ? undefined : () => push({ screen: "search" })}
+        />
       )}
 
-      {/* Bottom Navigation */}
-      {isMainTab && (
-        <View style={[styles.bottomNav, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity style={styles.navItem} onPress={() => navigate('Home')}>
-            <HomeIcon color={currentScreen === 'Home' ? colors.primary : colors.textMuted} size={28} />
-            <Text style={[styles.navText, currentScreen === 'Home' && { color: colors.primary }]}>HOME</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => navigate('Search')}>
-            <SearchIcon color={currentScreen === 'Search' ? colors.primary : colors.textMuted} size={28} />
-            <Text style={[styles.navText, currentScreen === 'Search' && { color: colors.primary }]}>SEARCH</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => navigate('Library')}>
-            <LibraryIcon color={currentScreen === 'Library' ? colors.primary : colors.textMuted} size={28} />
-            <Text style={[styles.navText, currentScreen === 'Library' && { color: colors.primary }]}>LIBRARY</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={{ flex: 1 }}>
+        {current?.screen === "now-playing" && <NowPlayingScreen onBack={pop} />}
+        {current?.screen === "search" && <SearchScreen onBack={pop} />}
+        {current?.screen === "preferences" && <PreferencesScreen />}
+        {current?.screen === "whats-new" && <WhatsNewScreen />}
+        {current?.screen === "logs" && <LogsScreen />}
+        {current?.screen === "artist" && <ArtistDetailScreen artistId={current.id} />}
+        {current?.screen === "album" && <AlbumDetailScreen albumId={current.id} />}
+        {current?.screen === "playlist" && <PlaylistDetailScreen playlistId={current.id} />}
+
+        {!current && activeTab === "home" && <HomeScreen onNavigate={handleHomeNav} />}
+        {!current && activeTab === "library" && (
+          <LibraryScreen key={libraryTab} initialTab={libraryTab} />
+        )}
+        {!current && activeTab === "plugins" && (
+          <PluginsScreen key={pluginsTab} initialTab={pluginsTab} />
+        )}
+      </View>
+
+      {!isNowPlaying && <MiniPlayer onTap={() => push({ screen: "now-playing" })} />}
+
+      {!isNowPlaying && <BottomNavigation active={activeTab} onTabChange={handleTabChange} />}
+
+      <ActionSheet
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="Quick actions"
+        options={[
+          {
+            label: "Preferences",
+            icon: <PreferencesIcon size={18} color={colors.ink} />,
+            onPress: () => push({ screen: "preferences" }),
+          },
+          {
+            label: "What's new",
+            icon: <WhatsNewIcon size={18} color={colors.ink} />,
+            onPress: () => push({ screen: "whats-new" }),
+          },
+          {
+            label: "Logs",
+            icon: <LogsIcon size={18} color={colors.ink} />,
+            onPress: () => push({ screen: "logs" }),
+          },
+        ]}
+      />
     </SafeAreaView>
   );
-};
+}
 
-export default function AppRoot() {
+export default function App() {
   return (
-    <ThemeProvider>
-      <PlayerProvider>
-        <NavigationProvider>
-          <AppShell />
-        </NavigationProvider>
-      </PlayerProvider>
-    </ThemeProvider>
+    <PlayerProvider>
+      <NavigationProvider>
+        <AppShell />
+      </NavigationProvider>
+    </PlayerProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1 },
-  miniPlayer: { flexDirection: 'row', alignItems: 'center', margin: 12, padding: 12, borderWidth: 3, borderRadius: 8, shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0, elevation: 4 },
-  miniPlayerInfo: { flex: 1, marginRight: 12 },
-  miniPlayerTitle: { fontSize: 16, fontWeight: '900', textTransform: 'uppercase' },
-  miniPlayerArtist: { fontSize: 14, fontWeight: '700' },
-  miniPlayBtn: { width: 40, height: 40, borderWidth: 2, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  bottomNav: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderTopWidth: 3, paddingVertical: 12, paddingBottom: 20 },
-  navItem: { alignItems: 'center', justifyContent: 'center' },
-  navText: { fontSize: 10, fontWeight: '900', marginTop: 4 },
+  appShell: {
+    flex: 1,
+    backgroundColor: colors.ground,
+  },
 });
