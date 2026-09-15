@@ -1,150 +1,52 @@
-import React, { useState } from "react";
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from "react-native";
-import { SectionHeader, SearchBar, DefaultArt } from "../components";
-import { FolderScanIcon, RefreshIcon } from "../icons";
-import { useTheme, Palette, fonts, space, type } from "../theme";
-import { AnimatedPressable, FadeSlideIn } from "../motion";
-import { scanLocalAudio, formatDuration, ScanStatus } from "../localLibrary";
-import { LocalTrack } from "../data";
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { useTheme } from '../theme';
+import { useAppNavigation } from '../navigation/NavigationContext';
+import { usePlayer } from '../player/PlayerContext';
+import { TrackRow } from '../widgets/TrackRow';
 
-interface LocalSongsScreenProps {
-  tracks: LocalTrack[];
-  onTracksScanned: (tracks: LocalTrack[]) => void;
-  onPlayTrack: (track: LocalTrack) => void;
-}
+const MOCK_LOCAL = [
+  { id: 'loc-1', title: 'Downloaded Mix 1', artist: 'Various', album: 'Local', duration: '5:42' },
+  { id: 'loc-2', title: 'Voice Memo 4', artist: 'Me', album: 'Local', duration: '1:15' },
+  { id: 'loc-3', title: 'Offline Beat', artist: 'Producer XYZ', album: 'Local', duration: '2:58' },
+];
 
-export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack }: LocalSongsScreenProps) {
-  const { colors, nbBorder } = useTheme();
-  const styles = createStyles(colors);
-  const [status, setStatus] = useState<ScanStatus>(tracks.length ? "done" : "idle");
-  const [search, setSearch] = useState("");
-
-  async function handleScan() {
-    setStatus("requesting-permission");
-    const result = await scanLocalAudio();
-    setStatus(result.status);
-    if (result.status === "done") {
-      onTracksScanned(result.tracks);
-    }
-  }
-
-  const filtered = tracks.filter(
-    (t) =>
-      t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.artist.toLowerCase().includes(search.toLowerCase())
-  );
+export const LocalSongsScreen: React.FC = () => {
+  const { colors, styles: globalStyles } = useTheme();
+  const { goBack } = useAppNavigation();
+  const { currentTrack, playTrack } = usePlayer();
 
   return (
-    <View style={{ flex: 1 }}>
-      <SectionHeader title="Local songs" subtitle="Music stored on this device" />
-
-      <View style={styles.scanBar}>
-        <AnimatedPressable onPress={handleScan} style={[styles.scanBtn, nbBorder]} scaleTo={0.96}>
-          {status === "requesting-permission" || status === "scanning" ? (
-            <ActivityIndicator color={colors.white} size="small" />
-          ) : (
-            <FolderScanIcon size={15} color={colors.white} />
-          )}
-          <Text style={styles.scanBtnLabel}>
-            {tracks.length ? "Rescan device" : "Scan for local songs"}
-          </Text>
-          {tracks.length > 0 && <RefreshIcon size={13} color={colors.white} />}
-        </AnimatedPressable>
+    <View style={styles.container}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={goBack}>
+          <Text style={[styles.backBtnText, { color: colors.text }]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[globalStyles.title, styles.headerTitle]}>LOCAL AUDIO</Text>
       </View>
 
-      {status === "denied" && (
-        <FadeSlideIn>
-          <View style={[styles.noticeBox, nbBorder]}>
-            <Text style={styles.noticeText}>
-              Permission to access media was denied. Enable it from your device settings to scan local songs.
-            </Text>
-          </View>
-        </FadeSlideIn>
-      )}
-
-      {status === "error" && (
-        <FadeSlideIn>
-          <View style={[styles.noticeBox, nbBorder]}>
-            <Text style={styles.noticeText}>Something went wrong scanning your device. Try again.</Text>
-          </View>
-        </FadeSlideIn>
-      )}
-
-      {tracks.length > 0 && (
-        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.xs }}>
-          <SearchBar placeholder="Search local songs..." value={search} onChange={setSearch} />
-        </View>
-      )}
-
       <FlatList
-        data={filtered}
+        data={MOCK_LOCAL}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.xs }}
-        ListEmptyComponent={
-          status === "idle" ? (
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>
-                Nothing scanned yet. Tap "Scan for local songs" to find audio files on your device — each
-                track shows whatever metadata it has, with a default icon standing in for missing artwork.
-              </Text>
-            </View>
-          ) : status === "done" ? (
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No audio files found on this device.</Text>
-            </View>
-          ) : null
-        }
+        contentContainerStyle={styles.list}
         renderItem={({ item, index }) => (
-          <FadeSlideIn delay={Math.min(index, 8) * 25}>
-            <AnimatedPressable onPress={() => onPlayTrack(item)} style={[styles.row, nbBorder]} scaleTo={0.98}>
-              <DefaultArt size={36} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.rowSubtitle} numberOfLines={1}>
-                  {item.artist}
-                </Text>
-              </View>
-              <Text style={styles.rowDuration}>{formatDuration(item.duration)}</Text>
-            </AnimatedPressable>
-          </FadeSlideIn>
+          <TrackRow
+            track={item}
+            index={index}
+            isPlaying={currentTrack?.id === item.id}
+            onPress={() => playTrack(item, MOCK_LOCAL)}
+          />
         )}
       />
     </View>
   );
-}
+};
 
-function createStyles(colors: Palette) {
-  return StyleSheet.create({
-    scanBar: { paddingHorizontal: space.lg, paddingBottom: space.md },
-    scanBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: space.xs,
-      backgroundColor: colors.ink,
-      paddingVertical: space.sm + 2,
-    },
-    scanBtnLabel: { fontFamily: fonts.displayBold, fontSize: type.caption, color: colors.white },
-    noticeBox: {
-      marginHorizontal: space.lg,
-      marginBottom: space.md,
-      backgroundColor: colors.surface,
-      padding: space.md,
-    },
-    noticeText: { fontFamily: fonts.body, fontSize: type.body, color: colors.ink, lineHeight: 18 },
-    emptyWrap: { paddingHorizontal: space.lg, paddingTop: space.xs },
-    emptyText: { fontFamily: fonts.body, fontSize: type.body, color: colors.muted, lineHeight: 18 },
-    row: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: space.md,
-      backgroundColor: colors.surface,
-      padding: space.xs + 2,
-    },
-    rowTitle: { fontFamily: fonts.displayBold, fontSize: type.body, color: colors.ink },
-    rowSubtitle: { fontFamily: fonts.body, fontSize: type.caption, color: colors.muted, marginTop: 1 },
-    rowDuration: { fontFamily: fonts.mono, fontSize: type.micro, color: colors.muted },
-  });
-}
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 24, borderBottomWidth: 3, gap: 16 },
+  headerTitle: { marginBottom: 0 },
+  backBtn: { width: 44, height: 44, borderWidth: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0, elevation: 3 },
+  backBtnText: { fontSize: 20, fontWeight: '900' },
+  list: { paddingVertical: 12 },
+});

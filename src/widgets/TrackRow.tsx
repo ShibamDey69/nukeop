@@ -1,186 +1,107 @@
-import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from "react-native";
-import { Track } from "../data";
-import { EqualizerIcon, HeartIcon, MoreVertIcon, QueueIcon, PlusCircleIcon, MusicNoteIcon } from "../icons";
-import { ActionSheet } from "./ActionSheet";
-import { usePlayer } from "../player/PlayerContext";
-import { useAppNavigation } from "../navigation/NavigationContext";
-import { colors, fonts } from "../theme";
-
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return "--:--";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../theme';
+import { Track } from '../data';
+import { MoreIcon } from '../icons';
 
 interface TrackRowProps {
   track: Track;
-  index?: number;
-  isActive?: boolean;
+  index: number;
   isPlaying?: boolean;
-  liked?: boolean;
   onPress: () => void;
-  onToggleLike?: () => void;
-  showArt?: boolean;
-  showMore?: boolean;
+  onOptionsPress?: () => void;
 }
 
-export function TrackRow({
-  track,
-  index,
-  isActive = false,
-  isPlaying = false,
-  liked,
-  onPress,
-  onToggleLike,
-  showArt = true,
-  showMore = true,
-}: TrackRowProps) {
-  const { playNext, addToQueue, toggleLike, isLiked } = usePlayer();
-  const { push } = useAppNavigation();
-  const [sheetOpen, setSheetOpen] = useState(false);
-
-  const isItemLiked = liked !== undefined ? liked : isLiked(track.id);
-
-  function handleToggleLike() {
-    if (onToggleLike) {
-      onToggleLike();
-    } else {
-      toggleLike(track.id);
-    }
-  }
+export const TrackRow: React.FC<TrackRowProps> = ({ track, index, isPlaying = false, onPress, onOptionsPress }) => {
+  const { colors } = useTheme();
 
   return (
-    <>
-      <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.65}>
-        <View style={styles.leading}>
-          {isActive && isPlaying ? (
-            <EqualizerIcon size={16} color={colors.accent} />
-          ) : index !== undefined ? (
-            <Text style={styles.index}>{index + 1}</Text>
-          ) : null}
-        </View>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={[
+        styles.container,
+        { 
+          backgroundColor: isPlaying ? colors.primary : colors.card, 
+          borderColor: colors.border,
+          shadowColor: colors.border 
+        }
+      ]}
+    >
+      <View style={[styles.indexContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.indexText, { color: colors.text }]}>{(index + 1).toString().padStart(2, '0')}</Text>
+      </View>
 
-        {showArt && (
-          track.image ? (
-            <Image source={{ uri: track.image }} style={styles.art} />
-          ) : (
-            <View style={styles.artPlaceholder}>
-              <MusicNoteIcon size={18} color={colors.ink} />
-            </View>
-          )
-        )}
+      <View style={styles.info}>
+        <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>
+          {track.title}
+        </Text>
+        <Text numberOfLines={1} style={[styles.artist, { color: colors.textMuted }]}>
+          {track.artist}
+        </Text>
+      </View>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={[styles.title, isActive && { color: colors.accent }]}
-            numberOfLines={1}
-          >
-            {track.title}
-          </Text>
-          <Text style={styles.artist} numberOfLines={1}>
-            {track.artist}
-          </Text>
-        </View>
+      <Text style={[styles.duration, { color: colors.text }]}>{track.duration}</Text>
 
-        <TouchableOpacity onPress={handleToggleLike} hitSlop={8} style={{ padding: 4 }}>
-          <HeartIcon
-            size={16}
-            color={isItemLiked ? colors.accent : colors.muted}
-            filled={isItemLiked}
-          />
+      {onOptionsPress && (
+        <TouchableOpacity 
+          onPress={onOptionsPress} 
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} 
+          style={styles.moreButton}
+        >
+          <MoreIcon color={colors.text} size={20} />
         </TouchableOpacity>
-
-        <Text style={styles.duration}>{formatDuration(track.duration)}</Text>
-
-        {showMore && (
-          <TouchableOpacity
-            onPress={() => setSheetOpen(true)}
-            hitSlop={8}
-            style={{ padding: 4, marginLeft: 2 }}
-          >
-            <MoreVertIcon size={18} color={colors.muted} />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-
-      <ActionSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={track.title}
-        subtitle={`${track.artist} · ${track.album}`}
-        options={[
-          {
-            label: "Play next in queue",
-            icon: <QueueIcon size={18} color={colors.ink} />,
-            onPress: () => {
-              playNext(track);
-              Alert.alert("Queue", `"${track.title}" will play next.`);
-            },
-          },
-          {
-            label: "Add to end of queue",
-            icon: <PlusCircleIcon size={18} color={colors.ink} />,
-            onPress: () => {
-              addToQueue(track);
-              Alert.alert("Queue", `"${track.title}" added to queue.`);
-            },
-          },
-          {
-            label: isItemLiked ? "Remove from Liked Songs" : "Save to Liked Songs",
-            icon: (
-              <HeartIcon
-                size={18}
-                color={isItemLiked ? colors.accent : colors.ink}
-                filled={isItemLiked}
-              />
-            ),
-            onPress: handleToggleLike,
-          },
-          ...(track.artistId && !track.isLocal
-            ? [
-                {
-                  label: `Go to ${track.artist}`,
-                  onPress: () => push({ screen: "artist", id: track.artistId }),
-                },
-              ]
-            : []),
-          ...(track.albumId && !track.isLocal
-            ? [
-                {
-                  label: `Go to ${track.album}`,
-                  onPress: () => push({ screen: "album", id: track.albumId }),
-                },
-              ]
-            : []),
-        ]}
-      />
-    </>
+      )}
+    </TouchableOpacity>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 6,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
   },
-  leading: { width: 20, alignItems: "center" },
-  index: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted },
-  art: { width: 40, height: 40, borderWidth: 2, borderColor: colors.ink },
-  artPlaceholder: {
-    width: 40,
-    height: 40,
+  indexContainer: {
+    width: 36,
+    height: 36,
     borderWidth: 2,
-    borderColor: colors.ink,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderRadius: 6,
   },
-  title: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-  artist: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 1 },
-  duration: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
+  indexText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  info: {
+    flex: 1,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  artist: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  duration: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: 10,
+  },
+  moreButton: {
+    padding: 4,
+    marginLeft: 6,
+  },
 });

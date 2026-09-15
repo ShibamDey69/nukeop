@@ -1,73 +1,48 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useState } from 'react';
 
-export type Route =
-  | { screen: "now-playing" }
-  | { screen: "preferences" }
-  | { screen: "whats-new" }
-  | { screen: "logs" }
-  | { screen: "search" }
-  | { screen: "local-songs" }
-  | { screen: "artist"; id: string }
-  | { screen: "album"; id: string }
-  | { screen: "playlist"; id: string };
+export type ScreenName = 'Home' | 'Search' | 'Library' | 'NowPlaying' | 'LocalSongs' | 'Preferences';
 
-export type NavDirection = "forward" | "back" | "none";
-
-interface NavigationContextValue {
-  stack: Route[];
-  current: Route | null;
-  direction: NavDirection;
-  canGoBack: boolean;
-  push: (route: Route) => void;
-  pop: () => boolean;
-  reset: () => void;
+interface NavigationState {
+  currentScreen: ScreenName;
+  params?: any;
 }
 
-const NavigationContext = createContext<NavigationContextValue | null>(null);
+interface NavigationContextType {
+  currentScreen: ScreenName;
+  params?: any;
+  navigate: (screen: ScreenName, params?: any) => void;
+  goBack: () => void;
+}
 
-export function NavigationProvider({ children }: { children: React.ReactNode }) {
-  const [stack, setStack] = useState<Route[]>([]);
-  const [direction, setDirection] = useState<NavDirection>("none");
+const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
-  const push = useCallback((route: Route) => {
-    setDirection("forward");
-    setStack((s) => [...s, route]);
-  }, []);
+export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [history, setHistory] = useState<NavigationState[]>([{ currentScreen: 'Home' }]);
 
-  const pop = useCallback(() => {
-    let didPop = false;
-    setStack((s) => {
-      if (s.length === 0) return s;
-      didPop = true;
-      return s.slice(0, -1);
-    });
-    setDirection("back");
-    return didPop;
-  }, []);
+  const current = history[history.length - 1];
 
-  const reset = useCallback(() => {
-    setDirection("none");
-    setStack([]);
-  }, []);
+  const navigate = (screen: ScreenName, params?: any) => {
+    setHistory(prev => [...prev, { currentScreen: screen, params }]);
+  };
 
-  const value = useMemo(
-    () => ({
-      stack,
-      current: stack[stack.length - 1] ?? null,
-      direction,
-      canGoBack: stack.length > 0,
-      push,
-      pop,
-      reset,
-    }),
-    [stack, direction, push, pop, reset]
+  const goBack = () => {
+    setHistory(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  };
+
+  return (
+    <NavigationContext.Provider value={{ 
+      currentScreen: current.currentScreen, 
+      params: current.params, 
+      navigate, 
+      goBack 
+    }}>
+      {children}
+    </NavigationContext.Provider>
   );
+};
 
-  return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
-}
-
-export function useAppNavigation(): NavigationContextValue {
+export const useAppNavigation = () => {
   const ctx = useContext(NavigationContext);
-  if (!ctx) throw new Error("useAppNavigation must be used within NavigationProvider");
+  if (!ctx) throw new Error('useAppNavigation must be used within NavigationProvider');
   return ctx;
-}
+};
