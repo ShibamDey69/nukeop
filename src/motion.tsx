@@ -1,10 +1,83 @@
 import React, { ReactNode, useEffect, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, ViewStyle, Pressable, PressableProps } from "react-native";
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  ViewStyle,
+  Pressable,
+  PressableProps,
+  Dimensions,
+} from "react-native";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+/**
+ * SlidingScreen gives navigation screens smooth, flowing sliding transitions.
+ * - 'horizontal': slides in from the right edge with a soft, flowing decelerating curve.
+ * - 'vertical': slides in from the bottom edge (ideal for Now Playing screen).
+ */
+export function SlidingScreen({
+  children,
+  variant = "horizontal",
+  style,
+}: {
+  children: ReactNode;
+  variant?: "horizontal" | "vertical";
+  style?: ViewStyle;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 290,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  const translateX =
+    variant === "horizontal"
+      ? anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [SCREEN_WIDTH * 0.9, 0],
+        })
+      : 0;
+
+  const translateY =
+    variant === "vertical"
+      ? anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [SCREEN_HEIGHT * 0.85, 0],
+        })
+      : 0;
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.1, 1],
+    outputRange: [0, 0.8, 1],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        StyleSheet.absoluteFillObject,
+        {
+          opacity,
+          transform: [{ translateX }, { translateY }],
+          backgroundColor: "#FCEBED",
+        },
+        style,
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 /**
  * FluidSwitcher cross-fades + slides between whatever child is passed in,
- * keyed by `screenKey`. Used for every top-level screen/tab/modal change so
- * navigation always feels like a continuous motion instead of a hard cut.
+ * keyed by `screenKey`. Used for tab changes so navigation feels like a
+ * continuous, flowing motion instead of a hard cut.
  */
 export function FluidSwitcher({
   screenKey,
@@ -26,7 +99,6 @@ export function FluidSwitcher({
 
   useEffect(() => {
     if (prevKey.current === screenKey) {
-      // Same screen, content updated in place — no transition needed.
       setDisplayed({ key: screenKey, node: children });
       return;
     }
@@ -36,7 +108,7 @@ export function FluidSwitcher({
     Animated.timing(progress, {
       toValue: 1,
       duration: 260,
-      easing: Easing.out(Easing.cubic),
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
     }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,11 +117,11 @@ export function FluidSwitcher({
   const sign = direction === "back" ? -1 : 1;
   const translateX = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [sign * 24, 0],
+    outputRange: [sign * 50, 0],
   });
   const opacity = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
+    inputRange: [0, 0.2, 1],
+    outputRange: [0, 0.7, 1],
   });
 
   return (
@@ -63,13 +135,12 @@ export function FluidSwitcher({
 }
 
 /**
- * FadeSlideIn plays a single fade+rise-in entrance the first time it mounts.
- * Pass `delay` to stagger a list of these (e.g. bento cards on Home).
+ * FadeSlideIn plays a single smooth slide-and-rise entrance with flowing bezier easing.
  */
 export function FadeSlideIn({
   children,
   delay = 0,
-  distance = 14,
+  distance = 20,
   style,
 }: {
   children: ReactNode;
@@ -82,9 +153,9 @@ export function FadeSlideIn({
   useEffect(() => {
     const anim = Animated.timing(progress, {
       toValue: 1,
-      duration: 340,
+      duration: 320,
       delay,
-      easing: Easing.out(Easing.cubic),
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
     });
     anim.start();
@@ -93,17 +164,17 @@ export function FadeSlideIn({
   }, []);
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] });
+  const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
-    <Animated.View style={[{ opacity: progress, transform: [{ translateY }] }, style]}>
+    <Animated.View style={[{ opacity, transform: [{ translateY }] }, style]}>
       {children}
     </Animated.View>
   );
 }
 
 /**
- * AnimatedPressable gives every tappable surface the same soft, springy
- * scale-down-on-press feedback so touch always feels immediate and fluid.
+ * AnimatedPressable gives tappable surfaces a soft, springy scale-down feedback.
  */
 export function AnimatedPressable({
   children,
@@ -141,12 +212,12 @@ export function AnimatedPressable({
   );
 }
 
-/** Simple fade-in wrapper for content that just needs to appear smoothly (no offset). */
+/** Simple fade-in wrapper for content that just needs to appear smoothly. */
 export function FadeIn({
   children,
   style,
   visible = true,
-  duration = 220,
+  duration = 240,
 }: {
   children: ReactNode;
   style?: any;
@@ -161,7 +232,7 @@ export function FadeIn({
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [visible]);
+  }, [visible, duration, opacity]);
   return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
 }
 

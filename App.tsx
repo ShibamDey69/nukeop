@@ -7,7 +7,6 @@ import {
   useFonts as useDMSansFonts,
   DMSans_400Regular,
   DMSans_500Medium,
-  DMSans_600SemiBold,
   DMSans_700Bold,
 } from "@expo-google-fonts/dm-sans";
 import {
@@ -17,7 +16,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from "@expo-google-fonts/jetbrains-mono";
 import App from "./src/App";
-import { ThemeProvider } from "./src/theme";
+import { colors } from "./src/theme";
 
 // Keep the native splash screen up until we say otherwise.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -35,7 +34,6 @@ export default function Root() {
   const [dmSansLoaded, dmSansError] = useDMSansFonts({
     DMSans_400Regular,
     DMSans_500Medium,
-    DMSans_600SemiBold,
     DMSans_700Bold,
   });
   const [monoLoaded, monoError] = useMonoFonts({
@@ -67,14 +65,12 @@ export default function Root() {
   }, [ready]);
 
   if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: "#FCEBED" }} />;
+    return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
   }
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
+      <App />
     </SafeAreaProvider>
   );
 }

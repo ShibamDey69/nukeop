@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from "react-native";
 import { SectionHeader, SearchBar, DefaultArt } from "../components";
 import { FolderScanIcon, RefreshIcon } from "../icons";
-import { useTheme, Palette, fonts } from "../theme";
+import { useTheme, Palette, fonts, space, type } from "../theme";
 import { AnimatedPressable, FadeSlideIn } from "../motion";
 import { scanLocalAudio, formatDuration, ScanStatus } from "../localLibrary";
 import { LocalTrack } from "../data";
@@ -14,7 +14,7 @@ interface LocalSongsScreenProps {
 }
 
 export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack }: LocalSongsScreenProps) {
-  const { colors, nbShadow } = useTheme();
+  const { colors, nbBorder } = useTheme();
   const styles = createStyles(colors);
   const [status, setStatus] = useState<ScanStatus>(tracks.length ? "done" : "idle");
   const [search, setSearch] = useState("");
@@ -39,22 +39,22 @@ export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack 
       <SectionHeader title="Local songs" subtitle="Music stored on this device" />
 
       <View style={styles.scanBar}>
-        <AnimatedPressable onPress={handleScan} style={[styles.scanBtn, nbShadow]} scaleTo={0.96}>
+        <AnimatedPressable onPress={handleScan} style={[styles.scanBtn, nbBorder]} scaleTo={0.96}>
           {status === "requesting-permission" || status === "scanning" ? (
             <ActivityIndicator color={colors.white} size="small" />
           ) : (
-            <FolderScanIcon size={16} color={colors.white} />
+            <FolderScanIcon size={15} color={colors.white} />
           )}
           <Text style={styles.scanBtnLabel}>
             {tracks.length ? "Rescan device" : "Scan for local songs"}
           </Text>
-          {tracks.length > 0 && <RefreshIcon size={14} color={colors.white} />}
+          {tracks.length > 0 && <RefreshIcon size={13} color={colors.white} />}
         </AnimatedPressable>
       </View>
 
       {status === "denied" && (
         <FadeSlideIn>
-          <View style={styles.noticeBox}>
+          <View style={[styles.noticeBox, nbBorder]}>
             <Text style={styles.noticeText}>
               Permission to access media was denied. Enable it from your device settings to scan local songs.
             </Text>
@@ -64,14 +64,14 @@ export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack 
 
       {status === "error" && (
         <FadeSlideIn>
-          <View style={styles.noticeBox}>
+          <View style={[styles.noticeBox, nbBorder]}>
             <Text style={styles.noticeText}>Something went wrong scanning your device. Try again.</Text>
           </View>
         </FadeSlideIn>
       )}
 
       {tracks.length > 0 && (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.xs }}>
           <SearchBar placeholder="Search local songs..." value={search} onChange={setSearch} />
         </View>
       )}
@@ -79,7 +79,7 @@ export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack 
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.xs }}
         ListEmptyComponent={
           status === "idle" ? (
             <View style={styles.emptyWrap}>
@@ -95,13 +95,9 @@ export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack 
           ) : null
         }
         renderItem={({ item, index }) => (
-          <FadeSlideIn delay={Math.min(index, 8) * 30}>
-            <AnimatedPressable
-              onPress={() => onPlayTrack(item)}
-              style={styles.row}
-              scaleTo={0.98}
-            >
-              <DefaultArt size={44} />
+          <FadeSlideIn delay={Math.min(index, 8) * 25}>
+            <AnimatedPressable onPress={() => onPlayTrack(item)} style={[styles.row, nbBorder]} scaleTo={0.98}>
+              <DefaultArt size={36} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {item.title}
@@ -121,40 +117,34 @@ export default function LocalSongsScreen({ tracks, onTracksScanned, onPlayTrack 
 
 function createStyles(colors: Palette) {
   return StyleSheet.create({
-    scanBar: { paddingHorizontal: 16, paddingBottom: 12 },
+    scanBar: { paddingHorizontal: space.lg, paddingBottom: space.md },
     scanBtn: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
-      borderWidth: 2,
-      borderColor: colors.border,
+      gap: space.xs,
       backgroundColor: colors.ink,
-      paddingVertical: 12,
+      paddingVertical: space.sm + 2,
     },
-    scanBtnLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
+    scanBtnLabel: { fontFamily: fonts.displayBold, fontSize: type.caption, color: colors.white },
     noticeBox: {
-      marginHorizontal: 16,
-      marginBottom: 12,
-      borderWidth: 2,
-      borderColor: colors.border,
+      marginHorizontal: space.lg,
+      marginBottom: space.md,
       backgroundColor: colors.surface,
-      padding: 12,
+      padding: space.md,
     },
-    noticeText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink, lineHeight: 19 },
-    emptyWrap: { paddingHorizontal: 16, paddingTop: 8 },
-    emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, lineHeight: 19 },
+    noticeText: { fontFamily: fonts.body, fontSize: type.body, color: colors.ink, lineHeight: 18 },
+    emptyWrap: { paddingHorizontal: space.lg, paddingTop: space.xs },
+    emptyText: { fontFamily: fonts.body, fontSize: type.body, color: colors.muted, lineHeight: 18 },
     row: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 12,
-      borderWidth: 2,
-      borderColor: colors.border,
+      gap: space.md,
       backgroundColor: colors.surface,
-      padding: 8,
+      padding: space.xs + 2,
     },
-    rowTitle: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
-    rowSubtitle: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 2 },
-    rowDuration: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
+    rowTitle: { fontFamily: fonts.displayBold, fontSize: type.body, color: colors.ink },
+    rowSubtitle: { fontFamily: fonts.body, fontSize: type.caption, color: colors.muted, marginTop: 1 },
+    rowDuration: { fontFamily: fonts.mono, fontSize: type.micro, color: colors.muted },
   });
 }

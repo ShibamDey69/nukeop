@@ -13,6 +13,21 @@ export const fonts = {
   monoSemibold: "JetBrainsMono_600SemiBold",
 };
 
+// A single compact scale used everywhere instead of one-off numbers per
+// screen — keeps density consistent and makes it easy to tighten the whole
+// app in one place. Sized for phones first; screens that need more room on
+// tablets read useWindowDimensions() themselves (see useResponsiveColumns).
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
+export const radii = { sm: 6, md: 10 };
+export const type = {
+  h1: 20, // screen titles — was 26/22, too large for a phone header
+  h2: 15, // section titles
+  body: 13,
+  label: 12,
+  caption: 11,
+  micro: 10,
+};
+
 export interface Palette {
   accent: string;
   accentLight: string;
@@ -123,25 +138,28 @@ export const levelBg: Record<string, string> = {
 
 // Neobrutalist "hard shadow" helpers — these depend on the current theme's
 // border color, so they're generated per-theme rather than being static.
+// Offsets are intentionally small (2 / 1) — the style reads as neobrutalist
+// from the hard-edged border + flat offset shadow, not from how far the
+// shadow is thrown, so this keeps the same look at a much lower-profile size.
 export function getNbBorder(p: Palette) {
-  return { borderWidth: 2, borderColor: p.border };
+  return { borderWidth: 1.5, borderColor: p.border };
 }
 export function getNbShadow(p: Palette) {
-  return {
-    shadowColor: p.border,
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  };
-}
-export function getNbShadowSm(p: Palette) {
   return {
     shadowColor: p.border,
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 0,
     elevation: 3,
+  };
+}
+export function getNbShadowSm(p: Palette) {
+  return {
+    shadowColor: p.border,
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
   };
 }
 

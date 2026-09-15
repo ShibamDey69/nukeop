@@ -1,37 +1,72 @@
-import { ARTISTS, ALBUMS, PLAYLISTS, ONLINE_RESULTS, SearchResult, LocalTrack } from "./data";
+import { ARTISTS, ALBUMS, PLAYLISTS, TRACKS, ONLINE_RESULTS, SearchResult, LocalTrack } from "./data";
 
 export type SearchScope = "local" | "global";
 
 function localCatalog(localTracks: LocalTrack[]): SearchResult[] {
-  const artists: SearchResult[] = ARTISTS.map((a) => ({
-    id: `artist-${a.id}`,
-    kind: "artist",
-    title: a.name,
-    subtitle: `${a.albumCount} albums`,
-    image: a.image,
-  }));
-  const albums: SearchResult[] = ALBUMS.map((a) => ({
-    id: `album-${a.id}`,
-    kind: "album",
-    title: a.title,
-    subtitle: `${a.artist} · ${a.year}`,
-    image: a.image,
-  }));
   const playlists: SearchResult[] = PLAYLISTS.map((p) => ({
     id: `playlist-${p.id}`,
+    entityId: p.id,
     kind: "playlist",
     title: p.name,
-    subtitle: `${p.trackCount} tracks`,
+    subtitle: `${p.trackIds.length} tracks`,
     image: p.image,
+    source: "local",
   }));
-  const tracks: SearchResult[] = localTracks.map((t) => ({
+
+  const deviceTracks: SearchResult[] = localTracks.map((t) => ({
     id: `local-${t.id}`,
+    entityId: t.id.startsWith("local-") ? t.id : `local-${t.id}`,
     kind: "track",
     title: t.title,
     subtitle: `${t.artist} · On this device`,
     image: "",
+    source: "local",
+    track: {
+      id: t.id.startsWith("local-") ? t.id : `local-${t.id}`,
+      title: t.title,
+      artist: t.artist,
+      artistId: "local-artist",
+      albumId: "local-album",
+      album: "On this device",
+      duration: t.duration,
+      image: "",
+      audioUrl: t.uri,
+      isLocal: true,
+    },
   }));
-  return [...tracks, ...artists, ...albums, ...playlists];
+
+  const libraryTracks: SearchResult[] = TRACKS.map((t) => ({
+    id: `track-${t.id}`,
+    entityId: t.id,
+    kind: "track",
+    title: t.title,
+    subtitle: `${t.artist} · ${t.album}`,
+    image: t.image,
+    source: "local",
+    track: t,
+  }));
+
+  const artists: SearchResult[] = ARTISTS.map((a) => ({
+    id: `artist-${a.id}`,
+    entityId: a.id,
+    kind: "artist",
+    title: a.name,
+    subtitle: `${a.albumCount} albums`,
+    image: a.image,
+    source: "local",
+  }));
+
+  const albums: SearchResult[] = ALBUMS.map((al) => ({
+    id: `album-${al.id}`,
+    entityId: al.id,
+    kind: "album",
+    title: al.title,
+    subtitle: `${al.artist} · ${al.year}`,
+    image: al.image,
+    source: "local",
+  }));
+
+  return [...deviceTracks, ...libraryTracks, ...artists, ...albums, ...playlists];
 }
 
 export function searchLocal(query: string, localTracks: LocalTrack[]): SearchResult[] {
@@ -57,6 +92,23 @@ export function searchGlobal(query: string): Promise<SearchResult[]> {
           (r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)
         )
       );
-    }, 550 + Math.random() * 350);
+    }, 400 + Math.random() * 250);
   });
 }
+
+export interface GroupedResults {
+  tracks: SearchResult[];
+  artists: SearchResult[];
+  albums: SearchResult[];
+  playlists: SearchResult[];
+}
+
+export function groupSearchResults(results: SearchResult[]): GroupedResults {
+  return {
+    tracks: results.filter((r) => r.kind === "track"),
+    artists: results.filter((r) => r.kind === "artist"),
+    albums: results.filter((r) => r.kind === "album"),
+    playlists: results.filter((r) => r.kind === "playlist"),
+  };
+}
+
