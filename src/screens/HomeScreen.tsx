@@ -11,7 +11,7 @@ import {
   WhatsNewIcon,
   LogsIcon,
 } from "../icons";
-import { colors, fonts, nbShadow } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 export type HomeNav =
   | "artists"
@@ -34,20 +34,23 @@ interface BentoCardProps {
   span2?: boolean;
 }
 
-function BentoCard({ children, onPress, style, span2 }: BentoCardProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      disabled={!onPress}
-      style={[styles.card, nbShadow, span2 && styles.cardSpan2, style]}
-    >
-      {children}
-    </TouchableOpacity>
-  );
-}
-
 export default function HomeScreen({ onNavigate }: HomeScreenProps) {
+  const { colors, nbShadow } = useTheme();
+  const styles = makeStyles(colors);
+
+  function BentoCard({ children, onPress, style, span2 }: BentoCardProps) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onPress}
+        disabled={!onPress}
+        style={[styles.card, nbShadow, span2 && styles.cardSpan2, style]}
+      >
+        {children}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 16 }}>
       <View style={styles.grid}>
@@ -152,38 +155,40 @@ export default function HomeScreen({ onNavigate }: HomeScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { flex: 1 },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    padding: 12,
-    gap: 12,
-  },
-  card: {
-    borderWidth: 2,
-    borderColor: colors.ink,
-    backgroundColor: colors.surface,
-    padding: 12,
-    justifyContent: "space-between",
-    width: "47%",
-  },
-  cardSpan2: { width: "100%" },
-  heroCard: { backgroundColor: colors.accent },
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  rowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  rowCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  heroTitle: {
-    fontFamily: fonts.display,
-    fontSize: 26,
-    lineHeight: 28,
-    letterSpacing: -0.8,
-    color: colors.white,
-    flexShrink: 1,
-  },
-  heroSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.white, opacity: 0.85, marginTop: 8 },
-  cardBottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 16 },
-  cardBottomRowSingle: { marginTop: 16 },
-  cardTitle: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
-  cardSubtitle: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 2 },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    content: { flex: 1 },
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      padding: 12,
+      gap: 12,
+    },
+    card: {
+      borderWidth: 2,
+      borderColor: colors.ink,
+      backgroundColor: colors.surface,
+      padding: 12,
+      justifyContent: "space-between",
+      width: "47%",
+    },
+    cardSpan2: { width: "100%" },
+    heroCard: { backgroundColor: colors.accent },
+    rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+    rowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+    rowCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+    heroTitle: {
+      fontFamily: fonts.display,
+      fontSize: 26,
+      lineHeight: 28,
+      letterSpacing: -0.8,
+      color: colors.white,
+      flexShrink: 1,
+    },
+    heroSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.white, opacity: 0.85, marginTop: 8 },
+    cardBottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 16 },
+    cardBottomRowSingle: { marginTop: 16 },
+    cardTitle: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
+    cardSubtitle: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 2 },
+  });
+}

@@ -5,9 +5,11 @@ import { TrackRow } from "../widgets/TrackRow";
 import { usePlayer } from "../player/PlayerContext";
 import { useAppNavigation } from "../navigation/NavigationContext";
 import { PlayIcon, ShuffleIcon } from "../icons";
-import { colors, fonts, nbShadow } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 export default function AlbumDetailScreen({ albumId }: { albumId: string }) {
+  const { colors, nbShadow } = useTheme();
+  const styles = makeStyles(colors);
   const album = ALBUMS.find((a) => a.id === albumId);
   const { push } = useAppNavigation();
   const { currentTrack, isPlaying, playQueue, playTrack, toggleShuffle, isLiked, toggleLike } = usePlayer();
@@ -73,33 +75,35 @@ export default function AlbumDetailScreen({ albumId }: { albumId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { alignItems: "center", paddingTop: 24, paddingBottom: 16, paddingHorizontal: 24 },
-  cover: { width: 180, height: 180, borderWidth: 2, borderColor: colors.ink },
-  title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.5, color: colors.ink, marginTop: 16, textAlign: "center" },
-  artistLink: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.accent, marginTop: 4 },
-  meta: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 6 },
-  actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-  playBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.accent,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  playLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
-  shuffleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  shuffleLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    header: { alignItems: "center", paddingTop: 24, paddingBottom: 16, paddingHorizontal: 24 },
+    cover: { width: 180, height: 180, borderWidth: 2, borderColor: colors.ink },
+    title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.5, color: colors.ink, marginTop: 16, textAlign: "center" },
+    artistLink: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.accent, marginTop: 4 },
+    meta: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 6 },
+    actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+    playBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.accent,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    playLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
+    shuffleBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    shuffleLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
+  });
+}

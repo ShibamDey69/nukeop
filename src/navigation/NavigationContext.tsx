@@ -6,6 +6,7 @@ export type Route =
   | { screen: "whats-new" }
   | { screen: "logs" }
   | { screen: "search" }
+  | { screen: "queue" }
   | { screen: "artist"; id: string }
   | { screen: "album"; id: string }
   | { screen: "playlist"; id: string };

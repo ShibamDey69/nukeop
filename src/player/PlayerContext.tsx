@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { AudioPlayer, AudioStatus, createAudioPlayer, setAudioModeAsync } from "expo-audio";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Track } from "../data";
+
+const LIKED_STORAGE_KEY = "nukeop:liked-track-ids";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -28,6 +31,13 @@ interface PlayerContextValue extends PlayerState {
   cycleRepeat: () => void;
   toggleLike: (trackId: string) => void;
   isLiked: (trackId: string) => boolean;
+  upNext: Track[];
+  addToQueue: (track: Track) => void;
+  playNext: (track: Track) => void;
+  removeFromQueue: (queueIndex: number) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
+  jumpToQueueIndex: (queueIndex: number) => void;
+  clearUpNext: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -57,6 +67,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const likedHydrated = useRef(false);
+
+  // Load previously-liked tracks from local storage on first mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(LIKED_STORAGE_KEY);
+        if (raw) {
+          const ids: string[] = JSON.parse(raw);
+          setState((s) => ({ ...s, likedIds: ids }));
+        }
+      } catch {
+        // ignore — start with an empty liked list
+      } finally {
+        likedHydrated.current = true;
+      }
+    })();
+  }, []);
+
+  // Persist liked tracks to local storage whenever they change.
+  useEffect(() => {
+    if (!likedHydrated.current) return;
+    AsyncStorage.setItem(LIKED_STORAGE_KEY, JSON.stringify(state.likedIds)).catch(() => {});
+  }, [state.likedIds]);
 
   useEffect(() => {
     (async () => {
@@ -104,9 +139,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     player.loop = state.repeatMode === "one";
   }, [player, state.repeatMode]);
 
+  // Only reload/restart audio when the *currently playing track itself*
+  // changes — not on every queue mutation. Without this, reordering or
+  // removing an upcoming (not-yet-played) item in the queue would also
+  // reset and restart whatever is currently playing, since it previously
+  // depended on the whole `queue` array reference.
+  const loadedTrackIdRef = useRef<string | null>(null);
   useEffect(() => {
     const track = state.queue[state.index];
-    if (!track) return;
+    if (!track) {
+      loadedTrackIdRef.current = null;
+      return;
+    }
+    if (loadedTrackIdRef.current === track.id) return;
+    loadedTrackIdRef.current = track.id;
     (async () => {
       try {
         setState((s) => ({ ...s, isBuffering: true, positionMillis: 0, durationMillis: 0 }));
@@ -194,7 +240,63 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const isLiked = useCallback((trackId: string) => state.likedIds.includes(trackId), [state.likedIds]);
 
+  // Insert a track right after the currently-playing one, so it plays next.
+  const playNext = useCallback((track: Track) => {
+    setState((s) => {
+      if (s.index < 0 || s.queue.length === 0) {
+        return { ...s, queue: [track], index: 0, isPlaying: true };
+      }
+      const nextQueue = [...s.queue];
+      nextQueue.splice(s.index + 1, 0, track);
+      return { ...s, queue: nextQueue };
+    });
+  }, []);
+
+  // Append a track to the very end of the queue.
+  const addToQueue = useCallback((track: Track) => {
+    setState((s) => {
+      if (s.index < 0 || s.queue.length === 0) {
+        return { ...s, queue: [track], index: 0, isPlaying: true };
+      }
+      return { ...s, queue: [...s.queue, track] };
+    });
+  }, []);
+
+  const removeFromQueue = useCallback((queueIndex: number) => {
+    setState((s) => {
+      if (queueIndex <= s.index) return s; // only allow removing upcoming tracks
+      const nextQueue = s.queue.filter((_, i) => i !== queueIndex);
+      return { ...s, queue: nextQueue };
+    });
+  }, []);
+
+  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
+    setState((s) => {
+      if (fromIndex <= s.index || toIndex <= s.index) return s; // only reorder upcoming tracks
+      if (fromIndex < 0 || fromIndex >= s.queue.length || toIndex < 0 || toIndex >= s.queue.length) return s;
+      const nextQueue = [...s.queue];
+      const [moved] = nextQueue.splice(fromIndex, 1);
+      nextQueue.splice(toIndex, 0, moved);
+      return { ...s, queue: nextQueue };
+    });
+  }, []);
+
+  const jumpToQueueIndex = useCallback((queueIndex: number) => {
+    setState((s) => {
+      if (queueIndex < 0 || queueIndex >= s.queue.length) return s;
+      return { ...s, index: queueIndex, isPlaying: true };
+    });
+  }, []);
+
+  const clearUpNext = useCallback(() => {
+    setState((s) => {
+      if (s.index < 0) return s;
+      return { ...s, queue: s.queue.slice(0, s.index + 1) };
+    });
+  }, []);
+
   const currentTrack = state.index >= 0 ? state.queue[state.index] ?? null : null;
+  const upNext = state.index >= 0 ? state.queue.slice(state.index + 1) : state.queue;
 
   const value: PlayerContextValue = {
     ...state,
@@ -209,6 +311,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     cycleRepeat,
     toggleLike,
     isLiked,
+    upNext,
+    addToQueue,
+    playNext,
+    removeFromQueue,
+    reorderQueue,
+    jumpToQueueIndex,
+    clearUpNext,
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

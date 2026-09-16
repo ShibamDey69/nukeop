@@ -5,13 +5,15 @@ import { SearchBar, TopBar } from "../components";
 import { TrackRow } from "../widgets/TrackRow";
 import { useAppNavigation } from "../navigation/NavigationContext";
 import { usePlayer } from "../player/PlayerContext";
-import { colors, fonts } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 interface SearchScreenProps {
   onBack: () => void;
 }
 
 export default function SearchScreen({ onBack }: SearchScreenProps) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [query, setQuery] = useState("");
   const { push } = useAppNavigation();
   const { currentTrack, isPlaying, playTrack, isLiked, toggleLike } = usePlayer();
@@ -141,7 +143,8 @@ export default function SearchScreen({ onBack }: SearchScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   emptyTitle: { fontFamily: fonts.displayBold, fontSize: 16, color: colors.ink, textAlign: "center" },
   emptySubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 6, textAlign: "center" },
@@ -161,4 +164,5 @@ const styles = StyleSheet.create({
   squareImage: { width: 44, height: 44, borderWidth: 2, borderColor: colors.ink },
   resultTitle: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
   resultSubtitle: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 1 },
-});
+  });
+}

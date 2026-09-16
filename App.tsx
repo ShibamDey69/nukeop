@@ -17,7 +17,7 @@ import {
   JetBrainsMono_600SemiBold,
 } from "@expo-google-fonts/jetbrains-mono";
 import App from "./src/App";
-import { colors } from "./src/theme";
+import { ThemeProvider, useTheme } from "./src/theme";
 
 // Keep the native splash screen up until we say otherwise.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -66,13 +66,16 @@ export default function Root() {
     }
   }, [ready]);
 
-  if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
-  }
-
   return (
-    <SafeAreaProvider>
-      <App />
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        {ready ? <App /> : <SplashFallback />}
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
+}
+
+function SplashFallback() {
+  const { colors } = useTheme();
+  return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
 }

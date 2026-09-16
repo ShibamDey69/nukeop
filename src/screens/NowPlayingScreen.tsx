@@ -15,8 +15,9 @@ import {
   HeartIcon,
   ShareIcon,
   PlusCircleIcon,
+  QueueIcon,
 } from "../icons";
-import { colors, fonts, nbShadow } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 function formatTime(millis: number): string {
   const totalSeconds = Math.floor(millis / 1000);
@@ -27,9 +28,12 @@ function formatTime(millis: number): string {
 
 interface NowPlayingScreenProps {
   onBack: () => void;
+  onQueue?: () => void;
 }
 
-export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
+export default function NowPlayingScreen({ onBack, onQueue }: NowPlayingScreenProps) {
+  const { colors, nbShadow } = useTheme();
+  const styles = makeStyles(colors);
   const {
     currentTrack,
     isPlaying,
@@ -45,6 +49,7 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
     cycleRepeat,
     toggleLike,
     isLiked,
+    upNext,
   } = usePlayer();
 
   const [dragMillis, setDragMillis] = useState<number | null>(null);
@@ -60,11 +65,11 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onBack} style={styles.iconBtn} hitSlop={10}>
-          <ChevronDownIcon size={24} />
+          <ChevronDownIcon size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>Now playing</Text>
         <TouchableOpacity onPress={() => setSheetOpen(true)} style={styles.iconBtn} hitSlop={10}>
-          <MoreVertIcon size={20} />
+          <MoreVertIcon size={20} color={colors.ink} />
         </TouchableOpacity>
       </View>
 
@@ -113,7 +118,7 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={prev} style={{ padding: 8 }} hitSlop={4}>
-          <SkipBackIcon size={24} />
+          <SkipBackIcon size={24} color={colors.ink} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={togglePlayPause} style={[styles.playBtn, nbShadow]}>
@@ -121,7 +126,7 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={next} style={{ padding: 8 }} hitSlop={4}>
-          <SkipForwardIcon size={24} />
+          <SkipForwardIcon size={24} color={colors.ink} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={cycleRepeat} style={{ padding: 8 }} hitSlop={4}>
@@ -129,6 +134,15 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
           {repeatMode === "one" && <View style={styles.repeatOneDot} />}
         </TouchableOpacity>
       </View>
+
+      {onQueue && (
+        <TouchableOpacity onPress={onQueue} style={styles.upNextBar} activeOpacity={0.7}>
+          <QueueIcon size={16} color={colors.ink} />
+          <Text style={styles.upNextLabel}>
+            {upNext.length > 0 ? `Up next: ${upNext[0].title}` : "Queue is empty"}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <ActionSheet
         visible={sheetOpen}
@@ -141,6 +155,15 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
             icon: <PlusCircleIcon size={18} color={colors.ink} />,
             onPress: () => Alert.alert("Added", `"${currentTrack.title}" was added to Liked Songs.`),
           },
+          ...(onQueue
+            ? [
+                {
+                  label: "View queue",
+                  icon: <QueueIcon size={18} color={colors.ink} />,
+                  onPress: onQueue,
+                },
+              ]
+            : []),
           {
             label: "Share track",
             icon: <ShareIcon size={18} color={colors.ink} />,
@@ -152,53 +175,68 @@ export default function NowPlayingScreen({ onBack }: NowPlayingScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.ground },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.ink,
-  },
-  iconBtn: { padding: 4 },
-  topBarTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink, letterSpacing: 0.3 },
-  artworkWrap: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
-  artwork: { width: "100%", aspectRatio: 1, borderWidth: 2, borderColor: colors.ink, overflow: "hidden" },
-  artworkImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  trackInfoRow: { paddingHorizontal: 24, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  trackTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, letterSpacing: -0.6, color: colors.ink },
-  trackArtist: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 4 },
-  progressWrap: { paddingHorizontal: 24, paddingTop: 12 },
-  progressLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
-  progressTime: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
-  controlsRow: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  repeatOneDot: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.ground },
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: colors.ink,
+    },
+    iconBtn: { padding: 4 },
+    topBarTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink, letterSpacing: 0.3 },
+    artworkWrap: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
+    artwork: { width: "100%", aspectRatio: 1, borderWidth: 2, borderColor: colors.ink, overflow: "hidden" },
+    artworkImage: { width: "100%", height: "100%", resizeMode: "cover" },
+    trackInfoRow: { paddingHorizontal: 24, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+    trackTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, letterSpacing: -0.6, color: colors.ink },
+    trackArtist: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 4 },
+    progressWrap: { paddingHorizontal: 24, paddingTop: 12 },
+    progressLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+    progressTime: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
+    controlsRow: {
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      paddingBottom: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    playBtn: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    repeatOneDot: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+    },
+    upNextBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginHorizontal: 24,
+      marginBottom: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      backgroundColor: colors.surface,
+    },
+    upNextLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink, flexShrink: 1 },
+  });
+}

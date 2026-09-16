@@ -4,10 +4,12 @@
     "slug": "nukeop-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "backgroundColor": "#FCEBED",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       [
         "expo-splash-screen",
@@ -22,8 +24,16 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "2.0.21"
+            "kotlinVersion": "2.1.20"
           }
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow nukeop to access your music library.",
+          "savePhotosPermission": false,
+          "isAccessMediaLocationEnabled": false
         }
       ]
     ],
@@ -34,6 +44,16 @@
     "android": {
       "package": "com.nukeop.mobile",
       "versionCode": 1,
+      "permissions": [
+        "READ_MEDIA_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FCEBED"
@@ -45,9 +65,8 @@
     },
     "extra": {
       "eas": {
-        "projectId": "fcc72aec-aac0-4020-a0e7-7188e45b4049"
+        "projectId": "9f6d9743-73f8-4f0d-8f1d-807b9dc1a2b4"
       }
-    },
-    "owner": "shibamdey69"
+    }
   }
 }

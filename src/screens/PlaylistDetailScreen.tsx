@@ -4,7 +4,7 @@ import { PLAYLISTS, TRACKS } from "../data";
 import { TrackRow } from "../widgets/TrackRow";
 import { usePlayer } from "../player/PlayerContext";
 import { PlayIcon, ShuffleIcon } from "../icons";
-import { colors, fonts, nbShadow } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 const VISIBILITY_LABEL: Record<string, string> = {
   my: "My playlist",
@@ -13,6 +13,8 @@ const VISIBILITY_LABEL: Record<string, string> = {
 };
 
 export default function PlaylistDetailScreen({ playlistId }: { playlistId: string }) {
+  const { colors, nbShadow } = useTheme();
+  const styles = makeStyles(colors);
   const playlist = PLAYLISTS.find((p) => p.id === playlistId);
   const { currentTrack, isPlaying, playQueue, playTrack, toggleShuffle, isLiked, toggleLike } = usePlayer();
 
@@ -74,33 +76,35 @@ export default function PlaylistDetailScreen({ playlistId }: { playlistId: strin
   );
 }
 
-const styles = StyleSheet.create({
-  header: { alignItems: "center", paddingTop: 24, paddingBottom: 16, paddingHorizontal: 24 },
-  cover: { width: 160, height: 160, borderWidth: 2, borderColor: colors.ink },
-  title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.5, color: colors.ink, marginTop: 16, textAlign: "center" },
-  meta: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 6 },
-  actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-  playBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.accent,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  playLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
-  shuffleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  shuffleLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-  emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center", paddingVertical: 24 },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    header: { alignItems: "center", paddingTop: 24, paddingBottom: 16, paddingHorizontal: 24 },
+    cover: { width: 160, height: 160, borderWidth: 2, borderColor: colors.ink },
+    title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.5, color: colors.ink, marginTop: 16, textAlign: "center" },
+    meta: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 6 },
+    actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+    playBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.accent,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    playLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
+    shuffleBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    shuffleLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
+    emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center", paddingVertical: 24 },
+  });
+}

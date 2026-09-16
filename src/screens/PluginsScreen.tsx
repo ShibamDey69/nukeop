@@ -5,7 +5,7 @@ import { ActionSheet } from "../widgets/ActionSheet";
 import { PLUGINS } from "../data";
 import type { Plugin } from "../data";
 import { ArrowUpRightIcon, GearIcon, CheckIcon } from "../icons";
-import { colors, fonts, nbShadow, nbShadowSm } from "../theme";
+import { useTheme, fonts, ThemeColors } from "../theme";
 
 type PluginsTab = "store" | "installed";
 type Category = "All" | "Themes" | "Lyrics" | "Visualizers" | "Tools";
@@ -21,15 +21,18 @@ interface PluginsScreenProps {
   initialTab?: PluginsTab;
 }
 
-function PluginIcon({ bg, label }: { bg: string; label: string }) {
-  return (
-    <View style={[styles.pluginIcon, { backgroundColor: bg }]}>
-      <Text style={styles.pluginIconLabel}>{label}</Text>
-    </View>
-  );
-}
-
 export default function PluginsScreen({ initialTab = "store" }: PluginsScreenProps) {
+  const { colors, nbShadow, nbShadowSm } = useTheme();
+  const styles = makeStyles(colors);
+
+  function PluginIcon({ bg, label }: { bg: string; label: string }) {
+    return (
+      <View style={[styles.pluginIcon, { backgroundColor: bg }]}>
+        <Text style={styles.pluginIconLabel}>{label}</Text>
+      </View>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<PluginsTab>(initialTab);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category>("All");
@@ -179,44 +182,46 @@ export default function PluginsScreen({ initialTab = "store" }: PluginsScreenPro
   );
 }
 
-const styles = StyleSheet.create({
-  hero: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    backgroundColor: colors.accent,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
-  heroTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, letterSpacing: -0.6, color: colors.white },
-  heroSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.white, opacity: 0.85, marginTop: 4 },
-  pluginIcon: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.ink,
-  },
-  pluginIconLabel: { fontFamily: fonts.monoSemibold, fontSize: 11, color: colors.white, textTransform: "uppercase" },
-  pluginRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    padding: 12,
-    backgroundColor: colors.surface,
-  },
-  pluginName: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
-  pluginVersion: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
-  installBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 2, borderColor: colors.ink },
-  installBtnLabel: { fontFamily: fonts.display, fontSize: 12, color: colors.white },
-  installedRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
-  installedRight: { flexDirection: "row", alignItems: "center", gap: 12 },
-  emptyText: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, paddingVertical: 32, textAlign: "center" },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    hero: {
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 12,
+      padding: 16,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      backgroundColor: colors.accent,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
+    heroTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, letterSpacing: -0.6, color: colors.white },
+    heroSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.white, opacity: 0.85, marginTop: 4 },
+    pluginIcon: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: colors.ink,
+    },
+    pluginIconLabel: { fontFamily: fonts.monoSemibold, fontSize: 11, color: colors.white, textTransform: "uppercase" },
+    pluginRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      padding: 12,
+      backgroundColor: colors.surface,
+    },
+    pluginName: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
+    pluginVersion: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
+    installBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 2, borderColor: colors.ink },
+    installBtnLabel: { fontFamily: fonts.display, fontSize: 12, color: colors.white },
+    installedRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+    installedRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+    emptyText: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, paddingVertical: 32, textAlign: "center" },
+  });
+}

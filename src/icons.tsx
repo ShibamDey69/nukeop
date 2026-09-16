@@ -27,6 +27,58 @@ export function MenuIcon({ size = 20, color = "#111111" }: IconProps) {
   );
 }
 
+export function QueueIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Line x1="3" y1="6" x2="15" y2="6" />
+      <Line x1="3" y1="12" x2="15" y2="12" />
+      <Line x1="3" y1="18" x2="10" y2="18" />
+      <Polyline points="18,14 22,17.5 18,21" />
+      <Line x1="22" y1="17.5" x2="22" y2="8" />
+    </Svg>
+  );
+}
+
+export function DragHandleIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Line x1="4" y1="8" x2="20" y2="8" />
+      <Line x1="4" y1="16" x2="20" y2="16" />
+    </Svg>
+  );
+}
+
+export function TrashIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Polyline points="3,6 5,6 21,6" />
+      <Path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <Line x1="10" y1="11" x2="10" y2="17" />
+      <Line x1="14" y1="11" x2="14" y2="17" />
+    </Svg>
+  );
+}
+
+export function ScanIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Path d="M3 7V4a1 1 0 011-1h3" />
+      <Path d="M17 3h3a1 1 0 011 1v3" />
+      <Path d="M21 17v3a1 1 0 01-1 1h-3" />
+      <Path d="M7 21H4a1 1 0 01-1-1v-3" />
+      <Circle cx="12" cy="12" r="4" />
+    </Svg>
+  );
+}
+
+export function FolderIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+    </Svg>
+  );
+}
+
 export function SearchIcon({ size = 20, color = "#111111" }: IconProps) {
   return (
     <Svg {...base(size, color)}>
@@ -95,6 +147,14 @@ export function ChevronDownIcon({ size = 20, color = "#111111" }: IconProps) {
   return (
     <Svg {...base(size, color)}>
       <Polyline points="6 9 12 15 18 9" />
+    </Svg>
+  );
+}
+
+export function ChevronUpIcon({ size = 20, color = "#111111" }: IconProps) {
+  return (
+    <Svg {...base(size, color)}>
+      <Polyline points="18 15 12 9 6 15" />
     </Svg>
   );
 }
