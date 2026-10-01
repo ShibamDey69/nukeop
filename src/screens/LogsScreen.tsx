@@ -1,104 +1,82 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
-import { LOGS } from "../data";
-import type { LogEntry } from "../data";
-import { SearchBar, SectionHeader, ChipRow } from "../components";
-import { useTheme, fonts, levelColors, levelBg, ThemeColors } from "../theme";
+import React, { useMemo, useState } from "react";
+import { FlatList, Text, View } from "react-native";
+import { Chip, EmptyState, Header, IconButton, LargeHeader, SearchField } from "../ui";
+import { formatLogTime, logger, LogLevel, useLogs } from "../logger";
+import { LogsIcon, TrashIcon } from "../icons";
+import { fonts, logLevelColors, radius, stroke, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
+import { useAppNavigation } from "../navigation/NavigationContext";
 
-type Level = "All" | "INFO" | "DEBUG" | "WARN" | "ERROR";
-
-const LEVELS: Level[] = ["All", "INFO", "DEBUG", "WARN", "ERROR"];
+type LevelFilter = "All" | LogLevel;
+const LEVELS: LevelFilter[] = ["All", "INFO", "DEBUG", "WARN", "ERROR"];
 
 export default function LogsScreen() {
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
-
-  function LogRow({ entry }: { entry: LogEntry }) {
-    return (
-      <View style={styles.logRow}>
-        <Text style={styles.logTime}>{entry.time}</Text>
-        <Text
-          style={[
-            styles.logLevel,
-            { color: levelColors[entry.level], backgroundColor: levelBg[entry.level] },
-          ]}
-        >
-          {entry.level}
-        </Text>
-        <Text style={styles.logMessage}>{entry.message}</Text>
-      </View>
-    );
-  }
-
+  const s = useThemedStyles(makeStyles);
+  const levelColors = logLevelColors(colors);
+  const entries = useLogs();
+  const { pop } = useAppNavigation();
   const [search, setSearch] = useState("");
-  const [levelFilter, setLevelFilter] = useState<Level>("All");
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>("All");
 
-  const filtered = LOGS.filter((log) => {
-    const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase());
-    const matchesLevel = levelFilter === "All" || log.level === levelFilter;
-    return matchesSearch && matchesLevel;
-  });
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return entries
+      .filter((e) => levelFilter === "All" || e.level === levelFilter)
+      .filter((e) => e.message.toLowerCase().includes(q))
+      .slice()
+      .reverse();
+  }, [entries, search, levelFilter]);
 
   return (
     <View style={{ flex: 1 }}>
-      <SectionHeader title="Log viewer" subtitle="View application logs" />
+      <Header onBack={pop} />
+      <LargeHeader
+        title="Logs"
+        subtitle={`${entries.length} entries this session`}
+        right={<IconButton label="Clear logs" variant="solid" icon={<TrashIcon size={17} color={colors.ink} />} onPress={() => logger.clear()} />}
+      />
 
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        <SearchBar placeholder="Search logs..." value={search} onChange={setSearch} />
+      <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
+        <SearchField placeholder="Search logs" value={search} onChange={setSearch} />
       </View>
 
-      <ChipRow>
-        {LEVELS.map((level) => {
-          const isActive = levelFilter === level;
-          const bg = isActive ? (level === "All" ? colors.ink : levelColors[level]) : colors.surface;
-          return (
-            <TouchableOpacity
-              key={level}
-              onPress={() => setLevelFilter(level)}
-              style={[styles.levelChip, { backgroundColor: bg }]}
-            >
-              <Text style={[styles.levelChipLabel, { color: isActive ? colors.white : colors.ink }]}>
-                {level}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ChipRow>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={LEVELS}
+        keyExtractor={(l) => l}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 12 }}
+        renderItem={({ item: level }) => <Chip label={level} active={levelFilter === level} onPress={() => setLevelFilter(level)} />}
+      />
 
-      <View style={styles.consoleWrap}>
-        <View style={styles.consoleHeader}>
-          <Text style={styles.consoleHeaderText}>nukeop — application log</Text>
+      <View style={s.consoleWrap}>
+        <View style={s.consoleHeader}>
+          <Text style={s.consoleHeaderText}>nukeop — session log</Text>
         </View>
         <FlatList
           data={filtered}
-          keyExtractor={(_, i) => String(i)}
-          renderItem={({ item }) => <LogRow entry={item} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>No entries match filter</Text>}
+          keyExtractor={(item) => String(item.id)}
+          inverted={false}
+          renderItem={({ item }) => (
+            <View style={s.logRow}>
+              <Text style={s.logTime}>{formatLogTime(item.ts)}</Text>
+              <Text style={[s.logLevel, { color: levelColors[item.level] }]}>{item.level}</Text>
+              <Text style={s.logMessage}>{item.message}</Text>
+            </View>
+          )}
+          ListEmptyComponent={<EmptyState icon={<LogsIcon size={22} color={colors.accent} />} title="No entries" message="Nothing matches your filter yet." />}
         />
       </View>
     </View>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    levelChip: { paddingHorizontal: 12, paddingVertical: 5, borderWidth: 2, borderColor: colors.ink },
-    levelChipLabel: { fontFamily: fonts.monoSemibold, fontSize: 11 },
-    consoleWrap: {
-      marginHorizontal: 16,
-      marginBottom: 16,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      backgroundColor: colors.surface,
-      flex: 1,
-      overflow: "hidden",
-    },
-    consoleHeader: { borderBottomWidth: 2, borderBottomColor: colors.ink, backgroundColor: colors.ink, paddingHorizontal: 12, paddingVertical: 6 },
-    consoleHeaderText: { fontFamily: fonts.mono, fontSize: 11, color: colors.white },
-    logRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
-    logTime: { fontFamily: fonts.mono, fontSize: 10, color: colors.muted, minWidth: 52 },
-    logLevel: { fontFamily: fonts.monoSemibold, fontSize: 10, minWidth: 40, textAlign: "center", paddingHorizontal: 2 },
-    logMessage: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink, flex: 1, flexWrap: "wrap" },
-    emptyText: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted, paddingVertical: 16, textAlign: "center" },
-  });
-}
+const makeStyles = ({ colors, shadows }: ThemeContextValue) => ({
+  consoleWrap: { marginHorizontal: 20, marginBottom: 16, borderRadius: radius.lg, borderWidth: stroke.base, borderColor: colors.outline, backgroundColor: colors.surface, flex: 1, overflow: "hidden" as const, ...shadows.sm },
+  consoleHeader: { backgroundColor: colors.ink, paddingHorizontal: 14, paddingVertical: 8 },
+  consoleHeaderText: { fontFamily: fonts.mono, fontSize: 11, color: colors.bg },
+  logRow: { flexDirection: "row" as const, alignItems: "flex-start" as const, gap: 8, paddingVertical: 7, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  logTime: { fontFamily: fonts.mono, fontSize: 10, color: colors.faint, minWidth: 54 },
+  logLevel: { fontFamily: fonts.monoMedium, fontSize: 10, minWidth: 42 },
+  logMessage: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink, flex: 1, flexWrap: "wrap" as const },
+});

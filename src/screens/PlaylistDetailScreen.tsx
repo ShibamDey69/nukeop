@@ -1,110 +1,158 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList } from "react-native";
-import { PLAYLISTS, TRACKS } from "../data";
+import React, { useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
+import { Header, EmptyState, IconButton, Button } from "../ui";
+import { PlaylistCover } from "../widgets/Artwork";
 import { TrackRow } from "../widgets/TrackRow";
+import { TrackActionsSheet } from "../widgets/TrackActionsSheet";
+import { ActionSheet } from "../widgets/ActionSheet";
+import { PromptSheet } from "../widgets/PromptSheet";
+import { AddTracksSheet } from "../widgets/AddTracksSheet";
+import { MoreVertIcon, PlayIcon, PencilIcon, PlusIcon, ShuffleIcon, TrashIcon } from "../icons";
+import { fonts, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
 import { usePlayer } from "../player/PlayerContext";
-import { PlayIcon, ShuffleIcon } from "../icons";
-import { useTheme, fonts, ThemeColors } from "../theme";
+import { useAppNavigation } from "../navigation/NavigationContext";
+import { library, useLibrary, useResolvedPlaylist } from "../library";
+import { formatTotalLength, plural } from "../format";
+import type { Track } from "../data";
 
-const VISIBILITY_LABEL: Record<string, string> = {
-  my: "My playlist",
-  public: "Public playlist",
-  liked: "Liked songs",
-};
+interface PlaylistDetailScreenProps {
+  playlistId: string;
+  onGoToArtist: (id: string) => void;
+  onGoToAlbum: (id: string) => void;
+}
 
-export default function PlaylistDetailScreen({ playlistId }: { playlistId: string }) {
-  const { colors, nbShadow } = useTheme();
-  const styles = makeStyles(colors);
-  const playlist = PLAYLISTS.find((p) => p.id === playlistId);
-  const { currentTrack, isPlaying, playQueue, playTrack, toggleShuffle, isLiked, toggleLike } = usePlayer();
+export default function PlaylistDetailScreen({ playlistId, onGoToArtist, onGoToAlbum }: PlaylistDetailScreenProps) {
+  const { colors } = useTheme();
+  const s = useThemedStyles(makeStyles);
+  const playlist = useResolvedPlaylist(playlistId);
+  const { currentTrack, isPlaying, playQueue, playTrack } = usePlayer();
+  const { isLiked } = useLibrary();
+  const { pop } = useAppNavigation();
 
-  if (!playlist) return null;
+  const [menuTrack, setMenuTrack] = useState<Track | null>(null);
+  const [headerMenu, setHeaderMenu] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [addingTracks, setAddingTracks] = useState(false);
 
-  const tracks = playlist.trackIds
-    .map((id) => TRACKS.find((t) => t.id === id))
-    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+  if (!playlist) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Header title="Playlist" onBack={pop} />
+        <EmptyState title="Playlist not found" message="It may have been deleted." />
+      </View>
+    );
+  }
+
+  const isEditable = playlist.kind === "user";
+  const totalSeconds = playlist.tracks.reduce((sum, t) => sum + t.duration, 0);
+  const images = playlist.tracks.slice(0, 4).map((t) => t.image);
+
+  function confirmDelete() {
+    Alert.alert("Delete playlist?", `“${playlist!.name}” will be removed. This can't be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => library.deletePlaylist(playlist!.id) },
+    ]);
+  }
 
   return (
-    <FlatList
-      data={tracks}
-      keyExtractor={(t) => t.id}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <Image source={{ uri: playlist.image }} style={[styles.cover, nbShadow]} />
-          <Text style={styles.title}>{playlist.name}</Text>
-          <Text style={styles.meta}>
-            {VISIBILITY_LABEL[playlist.visibility]} · {tracks.length} tracks
-          </Text>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <Header
+        title=""
+        onBack={pop}
+        right={isEditable ? <IconButton label="Playlist options" icon={<MoreVertIcon size={20} color={colors.ink} />} onPress={() => setHeaderMenu(true)} /> : undefined}
+      />
 
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={[styles.playBtn, nbShadow]}
-              onPress={() => tracks.length > 0 && playQueue(tracks, 0)}
-              activeOpacity={0.85}
-            >
-              <PlayIcon size={16} color={colors.white} />
-              <Text style={styles.playLabel}>Play</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shuffleBtn, nbShadow]}
-              onPress={() => {
-                toggleShuffle();
-                if (tracks.length > 0) playQueue(tracks, Math.floor(Math.random() * tracks.length));
-              }}
-              activeOpacity={0.85}
-            >
-              <ShuffleIcon size={16} color={colors.ink} />
-              <Text style={styles.shuffleLabel}>Shuffle</Text>
-            </TouchableOpacity>
-          </View>
+      <View style={s.hero}>
+        <PlaylistCover images={images} seed={playlist.id} size={168} radius={20} kind={playlist.kind === "liked" ? "liked" : "playlist"} style={{ alignSelf: "center" }} />
+        <Text style={s.title}>{playlist.name}</Text>
+        <Text style={s.meta}>
+          {plural(playlist.tracks.length, "track")}
+          {totalSeconds > 0 ? ` · ${formatTotalLength(totalSeconds)}` : ""}
+        </Text>
+
+        <View style={s.actionsRow}>
+          <Button label="Play" icon={<PlayIcon size={15} color={colors.onAccent} />} onPress={() => playQueue(playlist.tracks, 0)} disabled={playlist.tracks.length === 0} style={{ flex: 1 }} />
+          <Button
+            label="Shuffle"
+            variant="secondary"
+            icon={<ShuffleIcon size={15} color={colors.ink} />}
+            onPress={() => playQueue(playlist.tracks, 0, { shuffle: true })}
+            disabled={playlist.tracks.length === 0}
+            style={{ flex: 1 }}
+          />
+          {isEditable && <IconButton label="Add tracks" variant="solid" icon={<PlusIcon size={18} color={colors.ink} />} onPress={() => setAddingTracks(true)} />}
         </View>
-      }
-      ListEmptyComponent={<Text style={styles.emptyText}>This playlist has no tracks yet</Text>}
-      renderItem={({ item: track, index }) => (
-        <TrackRow
-          track={track}
-          index={index}
-          isActive={currentTrack?.id === track.id}
-          isPlaying={isPlaying}
-          liked={isLiked(track.id)}
-          onToggleLike={() => toggleLike(track.id)}
-          onPress={() => playTrack(track, tracks)}
+      </View>
+
+      {playlist.tracks.length === 0 ? (
+        <EmptyState
+          title="No tracks yet"
+          message={isEditable ? "Add tracks from your library to get started." : "This playlist doesn't have any tracks."}
+          action={isEditable ? <Button label="Add tracks" icon={<PlusIcon size={15} color={colors.onAccent} />} onPress={() => setAddingTracks(true)} /> : undefined}
         />
+      ) : (
+        playlist.tracks.map((track, i) => (
+          <TrackRow
+            key={`${track.id}-${i}`}
+            track={track}
+            index={i}
+            isActive={currentTrack?.id === track.id}
+            isPlaying={isPlaying}
+            liked={isLiked(track.id)}
+            onToggleLike={() => library.toggleLike(track)}
+            onPress={() => playTrack(track, playlist.tracks)}
+            onMore={() => setMenuTrack(track)}
+          />
+        ))
       )}
-      contentContainerStyle={{ paddingBottom: 24 }}
-    />
+
+      <TrackActionsSheet
+        visible={!!menuTrack}
+        track={menuTrack}
+        onClose={() => setMenuTrack(null)}
+        onGoToArtist={onGoToArtist}
+        onGoToAlbum={onGoToAlbum}
+        removeFromPlaylistId={isEditable ? playlist.id : undefined}
+      />
+
+      {isEditable && (
+        <>
+          <ActionSheet
+            visible={headerMenu}
+            onClose={() => setHeaderMenu(false)}
+            title={playlist.name}
+            options={[
+              { label: "Rename playlist", icon: <PencilIcon size={17} color={colors.ink} />, onPress: () => setRenaming(true) },
+              { label: "Add tracks", icon: <PlusIcon size={17} color={colors.ink} />, onPress: () => setAddingTracks(true) },
+              { label: "Delete playlist", destructive: true, icon: <TrashIcon size={17} color={colors.danger} />, onPress: confirmDelete },
+            ]}
+          />
+          <PromptSheet
+            visible={renaming}
+            title="Rename playlist"
+            initialValue={playlist.name}
+            confirmLabel="Save"
+            onCancel={() => setRenaming(false)}
+            onSubmit={(name) => {
+              library.renamePlaylist(playlist.id, name);
+              setRenaming(false);
+            }}
+          />
+          <AddTracksSheet
+            visible={addingTracks}
+            onClose={() => setAddingTracks(false)}
+            playlistId={playlist.id}
+            existingIds={new Set(playlist.tracks.map((t) => t.id))}
+          />
+        </>
+      )}
+    </ScrollView>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    header: { alignItems: "center", paddingTop: 24, paddingBottom: 16, paddingHorizontal: 24 },
-    cover: { width: 160, height: 160, borderWidth: 2, borderColor: colors.ink },
-    title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.5, color: colors.ink, marginTop: 16, textAlign: "center" },
-    meta: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 6 },
-    actionsRow: { flexDirection: "row", gap: 10, marginTop: 18 },
-    playBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      backgroundColor: colors.accent,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-    },
-    playLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
-    shuffleBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-    },
-    shuffleLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-    emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center", paddingVertical: 24 },
-  });
-}
+const makeStyles = ({ colors }: ThemeContextValue) => ({
+  hero: { alignItems: "center" as const, paddingHorizontal: 24, paddingTop: 4, paddingBottom: 22 },
+  title: { fontFamily: fonts.display, fontSize: 22, letterSpacing: -0.4, color: colors.ink, marginTop: 16, textAlign: "center" as const },
+  meta: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 6 },
+  actionsRow: { flexDirection: "row" as const, gap: 10, marginTop: 18, alignSelf: "stretch" as const, alignItems: "center" as const },
+});

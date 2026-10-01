@@ -1,65 +1,48 @@
-import React, { ReactNode, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  StyleSheet,
-  ScrollView,
-  Animated,
-} from "react-native";
-import {
-  MenuIcon,
-  SearchIcon,
-  BackIcon,
-  PlayIcon,
-  PauseIcon,
-  SkipBackIcon,
-  SkipForwardIcon,
-  HomeIcon,
-  LibraryIcon,
-  PluginsIcon,
-  QueueIcon,
-} from "./icons";
-import { usePlayer } from "./player/PlayerContext";
-import { useTheme, fonts, ThemeColors } from "./theme";
+import React from "react";
+import { Text, View } from "react-native";
+import { SearchIcon, HomeIcon, LibraryIcon, PluginsIcon, SkipBackIcon, SkipForwardIcon, PlayIcon, PauseIcon, QueueIcon } from "./icons";
+import { usePlayer, usePlayerProgress } from "./player/PlayerContext";
+import { fonts, radius, stroke, ThemeContextValue, useTheme, useThemedStyles } from "./theme";
+import { Artwork, EqBars } from "./widgets/Artwork";
+import { IconButton, PressableScale } from "./ui";
 
-interface TopBarProps {
-  title?: string;
-  onMenu?: () => void;
-  onBack?: () => void;
-  onSearch?: () => void;
-}
+// ── Home top bar ─────────────────────────────────────────────────────────
 
-export function TopBar({ title = "nukeop", onMenu, onBack, onSearch }: TopBarProps) {
+const makeTopBarStyles = ({ colors }: ThemeContextValue) => ({
+  bar: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 20, height: 52 },
+  brand: {
+    fontFamily: fonts.comic,
+    fontSize: 24,
+    letterSpacing: 0.5,
+    color: colors.ink,
+    transform: [{ rotate: "-2deg" }],
+  },
+});
+
+export function HomeTopBar({ onSearch }: { onSearch: () => void }) {
+  const s = useThemedStyles(makeTopBarStyles);
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
   return (
-    <View style={styles.topBar}>
-      <TouchableOpacity onPress={onBack ?? onMenu} style={styles.iconBtn} hitSlop={10}>
-        {onBack ? <BackIcon size={22} color={colors.ink} /> : <MenuIcon size={22} color={colors.ink} />}
-      </TouchableOpacity>
-      <Text style={styles.topBarTitle} numberOfLines={1}>
-        {title}
-      </Text>
-      <TouchableOpacity onPress={onSearch} style={styles.iconBtn} hitSlop={10} disabled={!onSearch}>
-        {onSearch ? <SearchIcon size={22} color={colors.ink} /> : <View style={{ width: 22, height: 22 }} />}
-      </TouchableOpacity>
+    <View style={s.bar}>
+      <Text style={s.brand}>nukeop</Text>
+      <IconButton label="Search" icon={<SearchIcon size={21} color={colors.ink} />} onPress={onSearch} />
     </View>
   );
 }
 
+// ── Bottom tab bar ───────────────────────────────────────────────────────
+
 export type Tab = "home" | "library" | "plugins";
 
-interface BottomNavProps {
-  active: Tab;
-  onTabChange: (tab: Tab) => void;
-}
+const makeBottomNavStyles = ({ colors }: ThemeContextValue) => ({
+  bar: { flexDirection: "row" as const, backgroundColor: colors.surface, paddingTop: 8 },
+  item: { flex: 1, alignItems: "center" as const, justifyContent: "center" as const, gap: 3, paddingVertical: 6 },
+  label: { fontSize: 10.5, marginTop: 1 },
+});
 
-export function BottomNavigation({ active, onTabChange }: BottomNavProps) {
+export function BottomNavigation({ active, onTabChange }: { active: Tab; onTabChange: (t: Tab) => void }) {
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
+  const s = useThemedStyles(makeBottomNavStyles);
   const tabs: { id: Tab; label: string; Icon: typeof HomeIcon }[] = [
     { id: "home", label: "Home", Icon: HomeIcon },
     { id: "library", label: "Library", Icon: LibraryIcon },
@@ -67,364 +50,109 @@ export function BottomNavigation({ active, onTabChange }: BottomNavProps) {
   ];
 
   return (
-    <View style={styles.bottomNav}>
+    <View style={s.bar}>
       {tabs.map(({ id, label, Icon }) => {
         const isActive = active === id;
-        const color = isActive ? colors.accent : colors.muted;
+        const color = isActive ? colors.accent : colors.faint;
         return (
-          <TouchableOpacity
-            key={id}
-            onPress={() => onTabChange(id)}
-            style={styles.bottomNavItem}
-            activeOpacity={0.6}
-            hitSlop={4}
-          >
-            {isActive && <View style={styles.bottomNavIndicator} />}
-            <Icon size={22} color={color} />
-            <Text
-              style={[
-                styles.bottomNavLabel,
-                { color, fontFamily: isActive ? fonts.bodyBold : fonts.bodyMedium },
-              ]}
-            >
-              {label}
-            </Text>
-          </TouchableOpacity>
+          <PressableScale key={id} onPress={() => onTabChange(id)} style={s.item} scaleTo={0.9}>
+            <Icon size={22} color={color} strokeWidth={isActive ? 2.3 : 2} />
+            <Text style={[s.label, { color, fontFamily: isActive ? fonts.bodyBold : fonts.bodyMedium }]}>{label}</Text>
+          </PressableScale>
         );
       })}
     </View>
   );
 }
 
-interface MiniPlayerProps {
-  onTap: () => void;
-  onQueue?: () => void;
-}
+// ── Mini player ──────────────────────────────────────────────────────────
 
-export function MiniPlayer({ onTap, onQueue }: MiniPlayerProps) {
+const makeMiniPlayerStyles = ({ colors, shadows }: ThemeContextValue) => ({
+  wrap: { paddingHorizontal: 10, paddingBottom: 8, backgroundColor: "transparent" },
+  card: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    borderRadius: radius.lg,
+    borderWidth: stroke.base,
+    borderColor: colors.outline,
+    backgroundColor: colors.surfaceAlt,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    overflow: "hidden" as const,
+    ...shadows.md,
+  },
+  progressTrack: { position: "absolute" as const, left: 0, right: 0, bottom: 0, height: 3, backgroundColor: "transparent" },
+  progressFill: { height: 3, backgroundColor: colors.accent },
+  info: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10, flex: 1, minWidth: 0 },
+  title: { fontFamily: fonts.bodyBold, fontSize: 13.5, color: colors.ink },
+  artist: { fontFamily: fonts.body, fontSize: 11.5, color: colors.muted, marginTop: 1 },
+  controls: { flexDirection: "row" as const, alignItems: "center" as const, gap: 2 },
+  queueDot: { position: "absolute" as const, top: -1, right: -1, width: 8, height: 8, borderRadius: radius.sm, backgroundColor: colors.accent, borderWidth: 1.5, borderColor: colors.surfaceAlt },
+});
+
+export function MiniPlayer({ onTap, onQueue }: { onTap: () => void; onQueue?: () => void }) {
+  const s = useThemedStyles(makeMiniPlayerStyles);
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const { currentTrack, isPlaying, isBuffering, positionMillis, durationMillis, queue, togglePlayPause, next, prev } =
-    usePlayer();
+  const { currentTrack, isPlaying, isBuffering, upNext, togglePlayPause, next, prev } = usePlayer();
+  const { positionMillis, durationMillis } = usePlayerProgress();
 
   if (!currentTrack) return null;
 
   const progress = durationMillis > 0 ? Math.min(1, positionMillis / durationMillis) : 0;
 
   return (
-    <View style={styles.miniPlayer}>
-      <View style={styles.miniPlayerProgressTrack}>
-        <View style={[styles.miniPlayerProgressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.miniPlayerRow}>
-        <TouchableOpacity onPress={onTap} style={styles.miniPlayerInfo} activeOpacity={0.75}>
-          <Image source={{ uri: currentTrack.image }} style={styles.miniPlayerArt} />
+    <View style={s.wrap}>
+      <PressableScale onPress={onTap} scaleTo={0.99} style={s.card} accessibilityLabel="Now playing">
+        <View style={s.info}>
+          <Artwork uri={currentTrack.image} seed={currentTrack.albumId || currentTrack.id} size={38} radius={9} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.miniPlayerTitle} numberOfLines={1}>
+            <Text style={s.title} numberOfLines={1}>
               {currentTrack.title}
             </Text>
-            <Text style={styles.miniPlayerArtist} numberOfLines={1}>
+            <Text style={s.artist} numberOfLines={1}>
               {currentTrack.artist}
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
 
-        <View style={styles.miniPlayerControls}>
-          <TouchableOpacity onPress={prev} style={styles.iconBtnSm} hitSlop={8}>
-            <SkipBackIcon size={18} color={colors.ink} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayPause} style={styles.iconBtnSm} hitSlop={8}>
-            {isBuffering ? (
-              <View style={styles.bufferingDot} />
-            ) : isPlaying ? (
-              <PauseIcon size={22} color={colors.ink} />
-            ) : (
-              <PlayIcon size={22} color={colors.ink} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={next} style={styles.iconBtnSm} hitSlop={8}>
-            <SkipForwardIcon size={18} color={colors.ink} />
-          </TouchableOpacity>
+        <View style={s.controls}>
+          <IconButton label="Previous" size={34} icon={<SkipBackIcon size={17} color={colors.ink} />} onPress={prev} />
+          <IconButton
+            label={isPlaying ? "Pause" : "Play"}
+            size={38}
+            variant="solid"
+            icon={
+              isBuffering ? (
+                <EqBars color={colors.ink} playing height={12} />
+              ) : isPlaying ? (
+                <PauseIcon size={18} color={colors.ink} />
+              ) : (
+                <PlayIcon size={18} color={colors.ink} />
+              )
+            }
+            onPress={togglePlayPause}
+          />
+          <IconButton label="Next" size={34} icon={<SkipForwardIcon size={17} color={colors.ink} />} onPress={next} />
           {onQueue && (
-            <TouchableOpacity onPress={onQueue} style={styles.iconBtnSm} hitSlop={8}>
-              <View>
-                <QueueIcon size={18} color={colors.ink} />
-                {queue.length > 0 && <View style={styles.queueDot} />}
-              </View>
-            </TouchableOpacity>
+            <IconButton
+              label="Queue"
+              size={34}
+              icon={
+                <View>
+                  <QueueIcon size={17} color={colors.ink} />
+                  {upNext.length > 0 && <View style={s.queueDot} />}
+                </View>
+              }
+              onPress={onQueue}
+            />
           )}
         </View>
-      </View>
+
+        <View style={s.progressTrack}>
+          <View style={[s.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+      </PressableScale>
     </View>
   );
 }
-
-interface SearchBarProps {
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoFocus?: boolean;
-}
-
-export function SearchBar({ placeholder, value, onChange, autoFocus }: SearchBarProps) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <View style={styles.searchBar}>
-      <SearchIcon size={16} color={colors.muted} />
-      <TextInput
-        style={styles.searchInput}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
-        value={value}
-        onChangeText={onChange}
-        autoFocus={autoFocus}
-        returnKeyType="search"
-      />
-    </View>
-  );
-}
-
-interface FilterChipProps {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}
-
-export function FilterChip({ label, active, onPress }: FilterChipProps) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={[styles.filterChip, { backgroundColor: active ? colors.ink : colors.surface }]}
-    >
-      <Text style={[styles.filterChipLabel, { color: active ? colors.surface : colors.ink }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-interface SubTabBarProps<T extends string> {
-  tabs: { id: T; label: string }[];
-  active: T;
-  onTab: (t: T) => void;
-}
-
-export function SubTabBar<T extends string>({ tabs, active, onTab }: SubTabBarProps<T>) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <View style={styles.subTabBar}>
-      {tabs.map(({ id, label }) => {
-        const isActive = active === id;
-        return (
-          <TouchableOpacity
-            key={id}
-            onPress={() => onTab(id)}
-            activeOpacity={0.7}
-            style={[styles.subTabItem, { borderBottomColor: isActive ? colors.accent : "transparent" }]}
-          >
-            <Text style={[styles.subTabLabel, { color: isActive ? colors.accent : colors.muted }]}>{label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-interface SectionHeaderProps {
-  title: string;
-  subtitle?: string;
-}
-
-export function SectionHeader({ title, subtitle }: SectionHeaderProps) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionHeaderTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionHeaderSubtitle}>{subtitle}</Text> : null}
-    </View>
-  );
-}
-
-interface ToggleProps {
-  value: boolean;
-  onChange: (v: boolean) => void;
-}
-
-export function Toggle({ value, onChange }: ToggleProps) {
-  const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const thumbX = useRef(new Animated.Value(value ? 22 : 2)).current;
-
-  useEffect(() => {
-    Animated.spring(thumbX, {
-      toValue: value ? 22 : 2,
-      useNativeDriver: false,
-      friction: 8,
-      tension: 90,
-    }).start();
-  }, [value, thumbX]);
-
-  return (
-    <TouchableOpacity
-      onPress={() => onChange(!value)}
-      activeOpacity={0.8}
-      style={[styles.toggleTrack, { backgroundColor: value ? "#22c55e" : "#e5e7eb", borderColor: colors.ink }]}
-    >
-      <Animated.View style={[styles.toggleThumb, { left: thumbX, borderColor: colors.ink }]} />
-    </TouchableOpacity>
-  );
-}
-
-export function ChipRow({ children }: { children: ReactNode }) {
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={staticStyles.chipRow}>
-      {children}
-    </ScrollView>
-  );
-}
-
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    topBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 2,
-      borderBottomColor: colors.ink,
-      backgroundColor: colors.ground,
-    },
-    iconBtn: { padding: 4 },
-    iconBtnSm: { padding: 6 },
-    topBarTitle: {
-      flex: 1,
-      textAlign: "center",
-      marginHorizontal: 8,
-      fontFamily: fonts.display,
-      fontSize: 18,
-      color: colors.ink,
-      letterSpacing: -0.5,
-    },
-    bottomNav: {
-      flexDirection: "row",
-      borderTopWidth: 2,
-      borderTopColor: colors.ink,
-      backgroundColor: colors.surface,
-    },
-    bottomNavItem: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-      paddingVertical: 10,
-    },
-    bottomNavIndicator: {
-      position: "absolute",
-      top: 0,
-      width: 28,
-      height: 3,
-      backgroundColor: colors.accent,
-    },
-    bottomNavLabel: { fontSize: 11 },
-    miniPlayer: {
-      borderTopWidth: 2,
-      borderBottomWidth: 2,
-      borderColor: colors.ink,
-      backgroundColor: colors.surface,
-    },
-    miniPlayerProgressTrack: { height: 3, backgroundColor: "#e5e7eb" },
-    miniPlayerProgressFill: { height: 3, backgroundColor: colors.accent },
-    miniPlayerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-    },
-    miniPlayerInfo: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
-    miniPlayerArt: { width: 40, height: 40, borderWidth: 2, borderColor: colors.ink },
-    miniPlayerTitle: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-    miniPlayerArtist: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
-    miniPlayerControls: { flexDirection: "row", alignItems: "center", gap: 4 },
-    bufferingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.muted },
-    queueDot: {
-      position: "absolute",
-      top: -2,
-      right: -2,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.accent,
-    },
-    searchBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      backgroundColor: colors.surface,
-    },
-    searchInput: {
-      flex: 1,
-      fontFamily: fonts.body,
-      fontSize: 14,
-      color: colors.ink,
-      padding: 0,
-    },
-    filterChip: {
-      borderWidth: 2,
-      borderColor: colors.ink,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-    },
-    filterChipLabel: { fontFamily: fonts.bodyMedium, fontSize: 13 },
-    subTabBar: { flexDirection: "row", backgroundColor: colors.ground, borderBottomWidth: 2, borderBottomColor: colors.ink },
-    subTabItem: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderBottomWidth: 3,
-    },
-    subTabLabel: { fontFamily: fonts.bodySemibold, fontSize: 13 },
-    sectionHeader: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
-    sectionHeaderTitle: {
-      fontFamily: fonts.display,
-      fontSize: 26,
-      lineHeight: 29,
-      letterSpacing: -0.7,
-      color: colors.ink,
-    },
-    sectionHeaderSubtitle: {
-      fontFamily: fonts.body,
-      fontSize: 13,
-      color: colors.muted,
-      marginTop: 2,
-    },
-    toggleTrack: {
-      width: 48,
-      height: 26,
-      borderRadius: 13,
-      borderWidth: 2,
-      justifyContent: "center",
-    },
-    toggleThumb: {
-      position: "absolute",
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      borderWidth: 2,
-      backgroundColor: "white",
-    },
-  });
-}
-
-// Style(s) that never depend on the active theme.
-const staticStyles = StyleSheet.create({
-  chipRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
-});

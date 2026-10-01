@@ -1,11 +1,14 @@
-import React, { ReactNode, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { SectionHeader, Toggle } from "../components";
-import { ActionSheet } from "../widgets/ActionSheet";
-import { ChevronRightIcon, CheckIcon } from "../icons";
-import { useTheme, fonts, ThemeColors, ThemeMode, AccentKey } from "../theme";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, View } from "react-native";
+import { Header, LargeHeader, PressableScale, SettingsGroup, SettingsRow, Switch } from "../ui";
+import { CheckIcon, InfoIcon, LogsIcon, MoonIcon, TrashIcon, WhatsNewIcon, YouTubeIcon } from "../icons";
+import { fonts, radius, stroke, ThemeContextValue, ThemeMode, useTheme, useThemedStyles } from "../theme";
+import { useSettings } from "../settings";
+import { library } from "../library";
+import { useAppNavigation } from "../navigation/NavigationContext";
+import { getPluginState } from "../plugins";
+import { pingYouTubeServer } from "../plugins/youtubeSource";
 
-const LANGUAGES = ["English (System)", "Spanish", "Japanese", "German", "French"];
 const MODES: { id: ThemeMode; label: string }[] = [
   { id: "system", label: "System" },
   { id: "light", label: "Light" },
@@ -13,208 +16,178 @@ const MODES: { id: ThemeMode; label: string }[] = [
 ];
 
 export default function PreferencesScreen() {
-  const { colors, mode, setMode, accentKey, setAccentKey, accents } = useTheme();
-  const styles = makeStyles(colors);
+  const { colors, mode, setMode, accentKey, setAccentKey, accentChoices, accentSwatch } = useTheme();
+  const s = useThemedStyles(makeStyles);
+  const settings = useSettings();
+  const { push, pop } = useAppNavigation();
+  const [ytUrlDraft, setYtUrlDraft] = useState(settings.youtubeServerUrl);
+  const [ytTesting, setYtTesting] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(settings.youtubeSourceMode === "server" || !!settings.youtubeServerUrl);
+  const youtubeInstalled = getPluginState("youtube").installed;
 
-  function Section({ title, children }: { title: string; children: ReactNode }) {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={styles.sectionBody}>{children}</View>
-      </View>
+  async function testYoutubeServer() {
+    setYtTesting(true);
+    const ok = await pingYouTubeServer(ytUrlDraft);
+    setYtTesting(false);
+    Alert.alert(ok ? "Connected" : "Couldn't connect", ok ? "The self-hosted server is reachable." : "Check the URL and make sure the server is running.");
+  }
+
+  function confirmReset() {
+    Alert.alert(
+      "Reset all data?",
+      "This clears liked songs, playlists, play history, saved YouTube tracks, and scanned local tracks. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reset", style: "destructive", onPress: () => library.resetAll() },
+      ]
     );
   }
-
-  interface PrefRowProps {
-    label: string;
-    right?: ReactNode;
-    onPress?: () => void;
-    border?: boolean;
-  }
-
-  function PrefRow({ label, right, onPress, border = true }: PrefRowProps) {
-    const Wrapper: any = onPress ? TouchableOpacity : View;
-    return (
-      <Wrapper onPress={onPress} activeOpacity={0.6} style={[styles.prefRow, border && styles.prefRowBorder]}>
-        <Text style={styles.prefLabel}>{label}</Text>
-        {right}
-      </Wrapper>
-    );
-  }
-
-  const [useAlbumColors, setUseAlbumColors] = useState(true);
-  const [compactMode, setCompactMode] = useState(false);
-  const [startOnBoot, setStartOnBoot] = useState(false);
-  const [checkUpdates, setCheckUpdates] = useState(true);
-  const [language, setLanguage] = useState(LANGUAGES[0]);
-  const [lastfmConnected, setLastfmConnected] = useState(false);
-  const [discordConnected, setDiscordConnected] = useState(false);
-  const [languageSheetOpen, setLanguageSheetOpen] = useState(false);
-
-  const accentKeys = Object.keys(accents) as AccentKey[];
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-      <SectionHeader title="Preferences" subtitle="Customize nukeop" />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+      <Header onBack={pop} />
+      <LargeHeader title="Preferences" subtitle="Customize nukeop" />
 
-      <Section title="Appearance">
-        <PrefRow
-          label="Theme"
-          border={false}
-          right={
-            <View style={styles.themeRow}>
-              {MODES.map((m) => {
-                const isActive = mode === m.id;
-                return (
-                  <TouchableOpacity
-                    key={m.id}
-                    onPress={() => setMode(m.id)}
-                    activeOpacity={0.75}
-                    style={[
-                      styles.themeBtn,
-                      { backgroundColor: isActive ? colors.ink : colors.surface },
-                    ]}
-                  >
-                    <Text style={[styles.themeBtnLabel, { color: isActive ? colors.white : colors.ink }]}>
-                      {m.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          }
-        />
-        <PrefRow
-          label="Accent color"
-          border={false}
-          right={
-            <View style={styles.themeRow}>
-              {accentKeys.map((key) => {
-                const isActive = accentKey === key;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    onPress={() => setAccentKey(key)}
-                    activeOpacity={0.75}
-                    style={[
-                      styles.swatch,
-                      { backgroundColor: accents[key].accent },
-                      isActive && { borderColor: colors.ink, borderWidth: 3 },
-                    ]}
-                  >
-                    {isActive && <CheckIcon size={12} color="#fff" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          }
-        />
-        <PrefRow
-          label="Use album colors"
-          right={<Toggle value={useAlbumColors} onChange={setUseAlbumColors} />}
-        />
-        <PrefRow label="Compact mode" border={false} right={<Toggle value={compactMode} onChange={setCompactMode} />} />
-      </Section>
+      <View style={{ paddingHorizontal: 20 }}>
+        <SettingsGroup title="Appearance">
+          <SettingsRow
+            label="Theme"
+            right={
+              <View style={s.pillRow}>
+                {MODES.map((m) => {
+                  const active = mode === m.id;
+                  return (
+                    <PressableScale key={m.id} onPress={() => setMode(m.id)} style={[s.pill, active && s.pillActive]} scaleTo={0.94}>
+                      <Text style={[s.pillLabel, active && s.pillLabelActive]}>{m.label}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            }
+          />
+          <SettingsRow
+            label="Accent color"
+            right={
+              <View style={s.swatchRow}>
+                {accentChoices.map((key) => {
+                  const active = accentKey === key;
+                  return (
+                    <PressableScale key={key} onPress={() => setAccentKey(key)} style={[s.swatch, { backgroundColor: accentSwatch(key) }, active && s.swatchActive]} scaleTo={0.85}>
+                      {active ? <CheckIcon size={12} color="#fff" strokeWidth={3} /> : null}
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            }
+          />
+          <SettingsRow label="Compact track rows" sublabel="Tighter spacing in track lists" right={<Switch value={settings.compactRows} onChange={(v) => settings.set({ compactRows: v })} />} />
+          <SettingsRow
+            label="Dynamic colors"
+            sublabel="Tint Now Playing with the track's own colour"
+            right={<Switch value={settings.dynamicColors} onChange={(v) => settings.set({ dynamicColors: v })} />}
+          />
+        </SettingsGroup>
 
-      <Section title="General">
-        <PrefRow
-          label="Language"
-          border={false}
-          onPress={() => setLanguageSheetOpen(true)}
-          right={
-            <View style={styles.linkRow}>
-              <Text style={styles.linkText}>{language}</Text>
-              <ChevronRightIcon size={14} color={colors.muted} />
-            </View>
-          }
-        />
-        <PrefRow
-          label="Start on system boot"
-          right={<Toggle value={startOnBoot} onChange={setStartOnBoot} />}
-        />
-        <PrefRow
-          label="Check for updates"
-          border={false}
-          right={<Toggle value={checkUpdates} onChange={setCheckUpdates} />}
-        />
-      </Section>
+        <SettingsGroup title="Playback">
+          <SettingsRow
+            label="Background playback"
+            sublabel="Keep playing and show lock-screen controls"
+            icon={<MoonIcon size={16} color={colors.ink} />}
+            right={<Switch value={settings.backgroundPlayback} onChange={(v) => settings.set({ backgroundPlayback: v })} />}
+          />
+          <SettingsRow
+            label="Resume on launch"
+            sublabel="Reopen your last queue, paused"
+            right={<Switch value={settings.resumeOnLaunch} onChange={(v) => settings.set({ resumeOnLaunch: v })} />}
+          />
+        </SettingsGroup>
 
-      <Section title="Integrations">
-        <PrefRow
-          label="Last.fm"
-          onPress={() => setLastfmConnected((c) => !c)}
-          right={
-            <View style={styles.linkRow}>
-              <Text style={[styles.linkText, lastfmConnected && { color: "#22c55e" }]}>
-                {lastfmConnected ? "Connected" : "Not connected"}
-              </Text>
-              <ChevronRightIcon size={14} color={colors.muted} />
-            </View>
-          }
-        />
-        <PrefRow
-          label="Discord"
-          border={false}
-          onPress={() => setDiscordConnected((c) => !c)}
-          right={
-            <View style={styles.linkRow}>
-              <Text style={[styles.linkText, discordConnected && { color: "#22c55e" }]}>
-                {discordConnected ? "Connected" : "Not connected"}
-              </Text>
-              <ChevronRightIcon size={14} color={colors.muted} />
-            </View>
-          }
-        />
-      </Section>
+        <SettingsGroup title="Local library">
+          <SettingsRow
+            label="Rescan on launch"
+            sublabel="Look for new on-device tracks every time nukeop opens"
+            right={<Switch value={settings.rescanOnLaunch} onChange={(v) => settings.set({ rescanOnLaunch: v })} />}
+          />
+        </SettingsGroup>
 
-      <ActionSheet
-        visible={languageSheetOpen}
-        onClose={() => setLanguageSheetOpen(false)}
-        title="Language"
-        options={LANGUAGES.map((lang) => ({
-          label: lang,
-          icon: lang === language ? <CheckIcon size={16} color={colors.accent} /> : undefined,
-          onPress: () => setLanguage(lang),
-        }))}
-      />
+        {youtubeInstalled && (
+          <SettingsGroup title="YouTube Source">
+            <SettingsRow
+              label="Works out of the box"
+              sublabel="Search and playback happen directly on your device — nothing to set up"
+              icon={<YouTubeIcon size={16} color={colors.ink} />}
+            />
+            <SettingsRow
+              label="Prefer self-hosted server"
+              sublabel="More reliable playback if direct streaming gets blocked; falls back to direct automatically"
+              right={
+                <Switch
+                  value={settings.youtubeSourceMode === "server"}
+                  onChange={(v) => {
+                    settings.set({ youtubeSourceMode: v ? "server" : "direct" });
+                    if (v) setShowAdvanced(true);
+                  }}
+                />
+              }
+            />
+            <SettingsRow label={showAdvanced ? "Hide advanced" : "Advanced: self-hosted server"} onPress={() => setShowAdvanced((v) => !v)} chevron />
+            {showAdvanced && (
+              <>
+                <View style={s.ytUrlRow}>
+                  <TextInput
+                    style={s.ytInput}
+                    value={ytUrlDraft}
+                    onChangeText={setYtUrlDraft}
+                    onEndEditing={() => settings.set({ youtubeServerUrl: ytUrlDraft.trim() })}
+                    placeholder="http://192.168.1.20:8787"
+                    placeholderTextColor={colors.faint}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
+                <SettingsRow
+                  label="Test connection"
+                  sublabel="Checks the yt-source-server URL above (see yt-source-server/README.md)"
+                  right={ytTesting ? <ActivityIndicator size="small" color={colors.accent} /> : undefined}
+                  onPress={ytTesting || !ytUrlDraft.trim() ? undefined : testYoutubeServer}
+                />
+              </>
+            )}
+          </SettingsGroup>
+        )}
+
+        <SettingsGroup title="About">
+          <SettingsRow label="What's new" icon={<WhatsNewIcon size={16} color={colors.ink} />} chevron onPress={() => push({ screen: "whats-new" })} />
+          <SettingsRow label="Logs" icon={<LogsIcon size={16} color={colors.ink} />} chevron onPress={() => push({ screen: "logs" })} />
+          <SettingsRow label="About nukeop" icon={<InfoIcon size={16} color={colors.ink} />} chevron onPress={() => push({ screen: "about" })} />
+        </SettingsGroup>
+
+        <SettingsGroup title="Data">
+          <SettingsRow label="Reset all data" icon={<TrashIcon size={16} color={colors.danger} />} destructive onPress={confirmReset} />
+        </SettingsGroup>
+      </View>
     </ScrollView>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    section: { paddingHorizontal: 16, marginBottom: 16 },
-    sectionTitle: {
-      fontFamily: fonts.display,
-      fontSize: 13,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-      color: colors.ink,
-      marginBottom: 8,
-    },
-    sectionBody: { borderWidth: 2, borderColor: colors.ink, backgroundColor: colors.surface },
-    prefRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    prefRowBorder: { borderTopWidth: 1, borderTopColor: "#e5e7eb" },
-    prefLabel: { fontFamily: fonts.body, fontSize: 14, color: colors.ink },
-    themeRow: { flexDirection: "row", gap: 6 },
-    themeBtn: { paddingHorizontal: 10, paddingVertical: 4, borderWidth: 2, borderColor: colors.ink },
-    themeBtnLabel: { fontFamily: fonts.bodySemibold, fontSize: 11 },
-    swatch: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    linkRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-    linkText: { fontFamily: fonts.body, fontSize: 14, color: colors.muted },
-  });
-}
+const makeStyles = ({ colors }: ThemeContextValue) => ({
+  pillRow: { flexDirection: "row" as const, gap: 6 },
+  pill: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: radius.pill, borderWidth: stroke.thin, borderColor: colors.outline, backgroundColor: colors.surfaceAlt },
+  pillActive: { backgroundColor: colors.accent },
+  pillLabel: { fontFamily: fonts.bodyBold, fontSize: 11.5, color: colors.ink },
+  pillLabelActive: { color: colors.onAccent },
+  swatchRow: { flexDirection: "row" as const, gap: 7, flexWrap: "wrap" as const, justifyContent: "flex-end" as const, maxWidth: 160 },
+  swatch: { width: 24, height: 24, borderRadius: radius.sm, alignItems: "center" as const, justifyContent: "center" as const, borderWidth: stroke.thin, borderColor: colors.outline },
+  swatchActive: { borderWidth: stroke.base, borderColor: colors.outline },
+  ytUrlRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: stroke.thin,
+    borderBottomColor: colors.border,
+  },
+  ytInput: { flex: 1, fontFamily: fonts.mono, fontSize: 13, color: colors.ink, padding: 0 },
+});

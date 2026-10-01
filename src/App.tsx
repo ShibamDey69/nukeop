@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, StyleSheet, StatusBar, BackHandler } from "react-native";
+import { Alert, BackHandler, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TopBar, BottomNavigation, MiniPlayer, Tab } from "./components";
-import { ActionSheet } from "./widgets/ActionSheet";
+import { HomeTopBar, BottomNavigation, MiniPlayer, Tab } from "./components";
 import { ScreenTransition } from "./widgets/ScreenTransition";
+import { NowPlayingSheet } from "./widgets/NowPlayingSheet";
 import { PlayerProvider, usePlayer } from "./player/PlayerContext";
 import { NavigationProvider, useAppNavigation, Route } from "./navigation/NavigationContext";
-import { ARTISTS, ALBUMS, PLAYLISTS, TRACKS } from "./data";
+import { useLibrary } from "./library";
 import HomeScreen, { HomeNav } from "./screens/HomeScreen";
 import LibraryScreen from "./screens/LibraryScreen";
 import PluginsScreen from "./screens/PluginsScreen";
@@ -16,35 +16,21 @@ import LogsScreen from "./screens/LogsScreen";
 import NowPlayingScreen from "./screens/NowPlayingScreen";
 import SearchScreen from "./screens/SearchScreen";
 import QueueScreen from "./screens/QueueScreen";
+import LyricsScreen from "./screens/LyricsScreen";
+import AboutScreen from "./screens/AboutScreen";
 import ArtistDetailScreen from "./screens/ArtistDetailScreen";
 import AlbumDetailScreen from "./screens/AlbumDetailScreen";
 import PlaylistDetailScreen from "./screens/PlaylistDetailScreen";
-import { NowPlayingSheet } from "./widgets/NowPlayingSheet";
-import { PreferencesIcon, WhatsNewIcon, LogsIcon } from "./icons";
 import { useTheme } from "./theme";
 
-type LibraryTab = "artists" | "albums" | "playlists";
+type LibraryTab = "artists" | "albums" | "playlists" | "storage";
 type PluginsTab = "store" | "installed";
 
-function routeTitle(route: Route): string {
-  switch (route.screen) {
-    case "preferences":
-      return "Preferences";
-    case "whats-new":
-      return "What's New";
-    case "logs":
-      return "Logs";
-    case "queue":
-      return "Queue";
-    case "artist":
-      return ARTISTS.find((a) => a.id === route.id)?.name ?? "Artist";
-    case "album":
-      return ALBUMS.find((a) => a.id === route.id)?.title ?? "Album";
-    case "playlist":
-      return PLAYLISTS.find((p) => p.id === route.id)?.name ?? "Playlist";
-    default:
-      return "nukeop";
-  }
+function notifyEmptyLibrary() {
+  Alert.alert(
+    "Nothing to play yet",
+    "Scan your device for music in Library → On device, or search for something to play (YouTube, if you've enabled that plugin)."
+  );
 }
 
 function routeKeyOf(current: Route | null, activeTab: Tab): string {
@@ -57,15 +43,12 @@ function AppShell() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [libraryTab, setLibraryTab] = useState<LibraryTab>("artists");
   const [pluginsTab, setPluginsTab] = useState<PluginsTab>("store");
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const { colors, isDark } = useTheme();
   const { stack, current, push, pop, reset } = useAppNavigation();
   const { currentTrack, playQueue } = usePlayer();
+  const { allTracks } = useLibrary();
 
-  // Tracks whether the most recent navigation change was a "forward" (push /
-  // tab change) or "backward" (pop) move, so the slide transition can enter
-  // from the correct side — the same way a native stack navigator would.
   const [direction, setDirection] = useState<1 | -1>(1);
   const prevStackLen = useRef(stack.length);
   useEffect(() => {
@@ -73,20 +56,17 @@ function AppShell() {
     prevStackLen.current = stack.length;
   }, [stack.length]);
 
-  // Android hardware back button: pop the in-app navigation stack instead of
-  // exiting the app. Only let the system handle back (i.e. exit / background
-  // the app) when there's nowhere left for us to go.
   useEffect(() => {
     const onBackPress = () => {
       if (current) {
         pop();
-        return true; // we handled it — don't let the app quit
+        return true;
       }
       if (activeTab !== "home") {
         setActiveTab("home");
         return true;
       }
-      return false; // at the root of the app — let the OS handle it (exit/background)
+      return false;
     };
     const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => subscription.remove();
@@ -99,66 +79,72 @@ function AppShell() {
   }
 
   function handleHomeNav(dest: HomeNav) {
-    if (dest === "artists") {
+    if (dest === "artists" || dest === "albums" || dest === "playlists") {
       setActiveTab("library");
-      setLibraryTab("artists");
-      reset();
-    } else if (dest === "albums") {
-      setActiveTab("library");
-      setLibraryTab("albums");
-      reset();
-    } else if (dest === "playlists") {
-      setActiveTab("library");
-      setLibraryTab("playlists");
+      setLibraryTab(dest);
       reset();
     } else if (dest === "plugins") {
       setActiveTab("plugins");
       setPluginsTab("store");
       reset();
     } else if (dest === "now-playing") {
-      if (!currentTrack) playQueue(TRACKS, 0);
-      push({ screen: "now-playing" });
+      if (currentTrack) {
+        push({ screen: "now-playing" });
+      } else if (allTracks.length > 0) {
+        playQueue(allTracks, 0);
+        push({ screen: "now-playing" });
+      } else {
+        notifyEmptyLibrary();
+      }
+    } else if (dest === "shuffle-all") {
+      if (allTracks.length > 0) {
+        playQueue(allTracks, 0, { shuffle: true });
+        push({ screen: "now-playing" });
+      } else {
+        notifyEmptyLibrary();
+      }
     } else {
       push({ screen: dest });
     }
   }
 
+  function goToArtist(id: string) {
+    push({ screen: "artist", id });
+  }
+  function goToAlbum(id: string) {
+    push({ screen: "album", id });
+  }
+  function goToPlaylist(id: string) {
+    push({ screen: "playlist", id });
+  }
+
   const isNowPlaying = current?.screen === "now-playing";
-  const isSearch = current?.screen === "search";
-  const isQueue = current?.screen === "queue";
-  const showOwnChrome = isNowPlaying || isSearch || isQueue;
+  const isHomeRoot = !current && activeTab === "home";
 
   return (
-    <SafeAreaView style={[styles.appShell, { backgroundColor: colors.ground }]} edges={["top", "bottom"]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.ground} />
+    <SafeAreaView style={[styles.appShell, { backgroundColor: colors.bg }]} edges={["top", "bottom"]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
 
-      {!showOwnChrome && (
-        <TopBar
-          title={current ? routeTitle(current) : "nukeop"}
-          onBack={current ? pop : undefined}
-          onMenu={current ? undefined : () => setMenuOpen(true)}
-          onSearch={current ? undefined : () => push({ screen: "search" })}
-        />
-      )}
+      {isHomeRoot && <HomeTopBar onSearch={() => push({ screen: "search" })} />}
 
       <View style={{ flex: 1 }}>
         <ScreenTransition routeKey={routeKeyOf(current, activeTab)} direction={direction}>
-          {current?.screen === "search" && <SearchScreen onBack={pop} />}
+          {current?.screen === "search" && <SearchScreen onBack={pop} onGoToArtist={goToArtist} onGoToAlbum={goToAlbum} onGoToPlaylist={goToPlaylist} />}
           {current?.screen === "queue" && <QueueScreen onBack={pop} />}
           {current?.screen === "preferences" && <PreferencesScreen />}
           {current?.screen === "whats-new" && <WhatsNewScreen />}
           {current?.screen === "logs" && <LogsScreen />}
-          {current?.screen === "artist" && <ArtistDetailScreen artistId={current.id} />}
-          {current?.screen === "album" && <AlbumDetailScreen albumId={current.id} />}
-          {current?.screen === "playlist" && <PlaylistDetailScreen playlistId={current.id} />}
+          {current?.screen === "lyrics" && <LyricsScreen onBack={pop} />}
+          {current?.screen === "about" && <AboutScreen />}
+          {current?.screen === "artist" && <ArtistDetailScreen artistId={current.id} onGoToAlbum={goToAlbum} />}
+          {current?.screen === "album" && <AlbumDetailScreen albumId={current.id} onGoToArtist={goToArtist} />}
+          {current?.screen === "playlist" && <PlaylistDetailScreen playlistId={current.id} onGoToArtist={goToArtist} onGoToAlbum={goToAlbum} />}
 
           {!current && activeTab === "home" && <HomeScreen onNavigate={handleHomeNav} />}
           {!current && activeTab === "library" && (
-            <LibraryScreen key={libraryTab} initialTab={libraryTab} />
+            <LibraryScreen key={libraryTab} initialTab={libraryTab} onGoToArtist={goToArtist} onGoToAlbum={goToAlbum} onGoToPlaylist={goToPlaylist} />
           )}
-          {!current && activeTab === "plugins" && (
-            <PluginsScreen key={pluginsTab} initialTab={pluginsTab} />
-          )}
+          {!current && activeTab === "plugins" && <PluginsScreen key={pluginsTab} initialTab={pluginsTab} />}
         </ScreenTransition>
       </View>
 
@@ -166,40 +152,14 @@ function AppShell() {
 
       <BottomNavigation active={activeTab} onTabChange={handleTabChange} />
 
-      {/* Rendered as a draggable overlay (not part of the normal stack
-          transition) so it can grow up from the mini player on open, and be
-          dragged back down — revealing the mini player underneath — to
-          dismiss, instead of an instant swap. It's presented via a Modal
-          (its own native layer), which does NOT automatically inherit the
-          outer SafeAreaView's insets — so it needs its own. */}
+      {/* Rendered as a draggable overlay so it can grow up from the mini player
+          and be dragged back down to dismiss. Presented via Modal (its own
+          native layer), which needs its own SafeAreaView. */}
       <NowPlayingSheet open={isNowPlaying} onDismiss={pop}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.ground }} edges={["top", "bottom"]}>
-          <NowPlayingScreen onBack={pop} onQueue={() => push({ screen: "queue" })} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "bottom"]}>
+          <NowPlayingScreen onBack={pop} onQueue={() => push({ screen: "queue" })} onLyrics={() => push({ screen: "lyrics" })} />
         </SafeAreaView>
       </NowPlayingSheet>
-
-      <ActionSheet
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        title="Quick actions"
-        options={[
-          {
-            label: "Preferences",
-            icon: <PreferencesIcon size={18} color={colors.ink} />,
-            onPress: () => push({ screen: "preferences" }),
-          },
-          {
-            label: "What's new",
-            icon: <WhatsNewIcon size={18} color={colors.ink} />,
-            onPress: () => push({ screen: "whats-new" }),
-          },
-          {
-            label: "Logs",
-            icon: <LogsIcon size={18} color={colors.ink} />,
-            onPress: () => push({ screen: "logs" }),
-          },
-        ]}
-      />
     </SafeAreaView>
   );
 }
@@ -215,7 +175,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  appShell: {
-    flex: 1,
-  },
+  appShell: { flex: 1 },
 });

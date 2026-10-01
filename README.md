@@ -18,8 +18,11 @@ single codebase.
 - Screen navigation is unchanged in spirit: `src/App.tsx` still holds the
   same tab + modal state machine as the original `App.tsx`, just rendering
   RN screens instead of DOM.
-- `src/data.ts` is copied over unmodified — it's plain TypeScript data and
-  needed no changes.
+- `src/data.ts` no longer holds a hardcoded demo catalog. It only holds
+  types plus real app metadata (the plugin registry, the changelog). What
+  used to be a fixed list of artists/albums/tracks is now derived live, at
+  render time, from whatever music is actually in your library — see
+  "Where your music comes from" below.
 
 ## Project layout
 
@@ -28,19 +31,53 @@ App.tsx                 entry point — loads fonts, then renders src/App
 src/
   App.tsx               tab/modal state machine (was App.tsx)
   theme.ts              colors, font names, shadow/border tokens
-  data.ts               mock data (artists, albums, playlists, plugins, logs…)
+  data.ts               types + real app metadata (plugin registry, changelog) — no music catalog
+  library.ts             the actual library: liked/playlists/history, derives
+                         Artists & Albums live from real tracks, smart playlists
+  localMusic.ts          on-device audio scan (expo-media-library)
+  plugins/
+    youtubeInnertube.ts   direct (server-less) YouTube search + stream resolution
+    youtubeServer.ts       optional self-hosted yt-dlp server client
+    youtubeSource.ts       orchestrates the two, exposes the plugin's public API
   icons.tsx             react-native-svg icon set
   components.tsx        TopBar, BottomNavigation, MiniPlayer, SearchBar,
                          FilterChip, SubTabBar, SectionHeader, Toggle, ChipRow
   screens/
-    HomeScreen.tsx
-    LibraryScreen.tsx
-    PluginsScreen.tsx
-    PreferencesScreen.tsx
-    WhatsNewScreen.tsx
-    LogsScreen.tsx
-    NowPlayingScreen.tsx
+    HomeScreen.tsx, SearchScreen.tsx, QueueScreen.tsx, LibraryScreen.tsx,
+    ArtistDetailScreen.tsx, AlbumDetailScreen.tsx, PlaylistDetailScreen.tsx,
+    PluginsScreen.tsx, PreferencesScreen.tsx, WhatsNewScreen.tsx,
+    LogsScreen.tsx, NowPlayingScreen.tsx, LyricsScreen.tsx, AboutScreen.tsx
 ```
+
+## Where your music comes from
+
+There is no built-in song catalog. Everything you see is one of:
+
+- **On-device files** — Library → On device → Scan for music (needs a dev/
+  production build; the underlying `expo-media-library` native module isn't
+  available in plain Expo Go).
+- **YouTube** (optional plugin, Search screen) — works immediately, no setup:
+  the app talks to YouTube's own API directly from your phone. This is
+  inherently best-effort for actual *playback* — YouTube increasingly
+  requires a signed "Proof of Origin" token on its streaming clients that
+  nothing running purely on-device can mint, so some videos may fail to
+  resolve a stream. Search itself doesn't need that token and is reliable.
+  For more reliable playback, `yt-source-server/` is still here as an
+  optional self-hosted fallback that runs the real, actively-maintained
+  `yt-dlp` — set its URL in Preferences → YouTube Source → Advanced and the
+  app will prefer it, falling back to direct mode automatically. See that
+  folder's own README for how to run it.
+- **Artists, Albums, "Recently played" and "Most played"** are all computed
+  live from the tracks above (`src/library.ts`) — there's nothing to seed or
+  configure, they just reflect whatever's actually in your library.
+
+Running `yt-dlp` (the real Python tool) or `yt-dlp-wrap` (its Node subprocess
+wrapper) *inside* the React Native app itself isn't possible on either
+platform — there's no Python runtime and no subprocess/exec primitive in an
+iOS or Android app sandbox. That's the reason the optional server exists at
+all; the direct client in `src/plugins/youtubeInnertube.ts` is a from-scratch
+reimplementation of just the HTTP/JSON parts (search, and best-effort stream
+resolution), not a port of yt-dlp itself.
 
 ## Running it in dev mode
 
@@ -140,8 +177,18 @@ or `pnpm install` both work the same way as `npm install` above.
 
 ## Notes
 
-- Artist/album/playlist artwork still points at the original Unsplash URLs
-  from the mock data — swap in your own asset pipeline for production use.
+- Artwork comes from whatever source provided the track (a YouTube
+  thumbnail, for instance); on-device files usually don't carry any, in
+  which case the UI falls back to a generated gradient (seeded per
+  track/album/artist id, so it's at least stable rather than random each
+  render).
+- Background playback needs a real dev/production build, not Expo Go — the
+  `expo-audio` config plugin (`enableBackgroundPlayback: true` in
+  `app.json`) bakes in the iOS `UIBackgroundModes: audio` entitlement and
+  the Android foreground-service + notification permissions, none of which
+  Expo Go can grant on your behalf. Without a full rebuild after pulling
+  this change, background playback will still get killed after a few
+  minutes on Android in particular.
 - `react-native-svg` and `@react-native-community/slider` both need native
   modules; if you're using Expo Go this is already handled, but a bare RN
   CLI project would need `pod install` after adding them.

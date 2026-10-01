@@ -1,8 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet, Alert } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import Slider from "@react-native-community/slider";
-import { usePlayer } from "../player/PlayerContext";
-import { ActionSheet } from "../widgets/ActionSheet";
+import { usePlayer, usePlayerProgress } from "../player/PlayerContext";
+import { ActionSheet, ActionSheetOption } from "../widgets/ActionSheet";
+import { TrackActionsSheet } from "../widgets/TrackActionsSheet";
+import { Artwork } from "../widgets/Artwork";
+import { Gradient } from "../widgets/Gradient";
 import {
   ChevronDownIcon,
   MoreVertIcon,
@@ -12,86 +15,124 @@ import {
   SkipForwardIcon,
   ShuffleIcon,
   RepeatIcon,
+  RepeatOneIcon,
   HeartIcon,
-  ShareIcon,
-  PlusCircleIcon,
+  ListPlusIcon,
   QueueIcon,
+  ClockIcon,
+  GaugeIcon,
+  LyricsIcon,
+  CheckIcon,
 } from "../icons";
-import { useTheme, fonts, ThemeColors } from "../theme";
+import { fonts, radius, stroke, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
+import { formatMillis } from "../format";
+import { library, useLibrary } from "../library";
+import { useSettings } from "../settings";
+import { tintFor } from "../color";
+import { IconButton } from "../ui";
 
-function formatTime(millis: number): string {
-  const totalSeconds = Math.floor(millis / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+const SLEEP_OPTIONS: { label: string; value: number | "track" | null }[] = [
+  { label: "Off", value: null },
+  { label: "End of track", value: "track" },
+  { label: "10 minutes", value: 10 },
+  { label: "20 minutes", value: 20 },
+  { label: "45 minutes", value: 45 },
+  { label: "1 hour", value: 60 },
+];
 
 interface NowPlayingScreenProps {
   onBack: () => void;
   onQueue?: () => void;
+  onLyrics?: () => void;
 }
 
-export default function NowPlayingScreen({ onBack, onQueue }: NowPlayingScreenProps) {
-  const { colors, nbShadow } = useTheme();
-  const styles = makeStyles(colors);
+export default function NowPlayingScreen({ onBack, onQueue, onLyrics }: NowPlayingScreenProps) {
+  const { colors, isDark } = useTheme();
+  const s = useThemedStyles(makeStyles);
+  const { dynamicColors } = useSettings();
   const {
     currentTrack,
     isPlaying,
-    positionMillis,
-    durationMillis,
+    isBuffering,
     shuffle,
     repeatMode,
+    playbackRate,
+    sleep,
+    upNext,
     togglePlayPause,
     seek,
     next,
     prev,
     toggleShuffle,
     cycleRepeat,
-    toggleLike,
-    isLiked,
-    upNext,
+    setPlaybackRate,
+    setSleepTimer,
   } = usePlayer();
+  const { positionMillis, durationMillis } = usePlayerProgress();
+  const { isLiked } = useLibrary();
 
   const [dragMillis, setDragMillis] = useState<number | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [speedSheet, setSpeedSheet] = useState(false);
+  const [sleepSheet, setSleepSheet] = useState(false);
+  const [trackActions, setTrackActions] = useState(false);
 
   if (!currentTrack) return null;
 
   const liked = isLiked(currentTrack.id);
   const shownPosition = dragMillis ?? positionMillis;
   const totalMillis = durationMillis || currentTrack.duration * 1000;
+  const [tintA, tintB] = tintFor(currentTrack.albumId || currentTrack.id, isDark);
+
+  const repeatColor = repeatMode !== "off" ? colors.accent : colors.faint;
+
+  const menuOptions: ActionSheetOption[] = [
+    { label: "Track options", icon: <ListPlusIcon size={17} color={colors.ink} />, onPress: () => setTrackActions(true) },
+    {
+      label: `Playback speed · ${playbackRate}×`,
+      icon: <GaugeIcon size={17} color={colors.ink} />,
+      onPress: () => setSpeedSheet(true),
+    },
+    {
+      label: sleep ? `Sleep timer · ${sleep.kind === "track" ? "end of track" : "on"}` : "Sleep timer",
+      icon: <ClockIcon size={17} color={colors.ink} />,
+      onPress: () => setSleepSheet(true),
+    },
+  ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={onBack} style={styles.iconBtn} hitSlop={10}>
-          <ChevronDownIcon size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Now playing</Text>
-        <TouchableOpacity onPress={() => setSheetOpen(true)} style={styles.iconBtn} hitSlop={10}>
-          <MoreVertIcon size={20} color={colors.ink} />
-        </TouchableOpacity>
+    <View style={s.container}>
+      {dynamicColors && (
+        <Gradient
+          stops={[{ color: tintA, opacity: 0.35 }, { color: colors.bg, opacity: 0 }]}
+          direction="vertical"
+          style={{ position: "absolute", left: 0, right: 0, top: 0, height: 420 }}
+          pointerEvents="none"
+        />
+      )}
+
+      <View style={s.topBar}>
+        <IconButton label="Close" icon={<ChevronDownIcon size={24} color={colors.ink} />} onPress={onBack} />
+        <Text style={s.topBarTitle}>Now playing</Text>
+        <IconButton label="More options" icon={<MoreVertIcon size={20} color={colors.ink} />} onPress={() => setMenuOpen(true)} />
       </View>
 
-      <View style={styles.artworkWrap}>
-        <View style={[styles.artwork, nbShadow]}>
-          <Image source={{ uri: currentTrack.image }} style={styles.artworkImage} />
-        </View>
+      <View style={s.artworkWrap}>
+        <Artwork uri={currentTrack.image} seed={currentTrack.albumId || currentTrack.id} radius={22} />
       </View>
 
-      <View style={styles.trackInfoRow}>
+      <View style={s.trackInfoRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.trackTitle} numberOfLines={2}>
+          <Text style={s.trackTitle} numberOfLines={2}>
             {currentTrack.title}
           </Text>
-          <Text style={styles.trackArtist}>{currentTrack.artist}</Text>
+          <Text style={s.trackArtist}>{currentTrack.artist}</Text>
         </View>
-        <TouchableOpacity onPress={() => toggleLike(currentTrack.id)} style={{ padding: 8 }} hitSlop={4}>
-          <HeartIcon size={22} color={liked ? colors.accent : colors.muted} filled={liked} />
-        </TouchableOpacity>
+        <IconButton label={liked ? "Unlike" : "Like"} icon={<HeartIcon size={22} color={liked ? colors.accent : colors.faint} filled={liked} />} onPress={() => library.toggleLike(currentTrack)} />
       </View>
 
-      <View style={styles.progressWrap}>
+      <View style={s.progressWrap}>
         <Slider
           style={{ width: "100%", height: 32 }}
           minimumValue={0}
@@ -103,140 +144,116 @@ export default function NowPlayingScreen({ onBack, onQueue }: NowPlayingScreenPr
             setDragMillis(null);
           }}
           minimumTrackTintColor={colors.accent}
-          maximumTrackTintColor={colors.ink}
+          maximumTrackTintColor={colors.surfaceHigh}
           thumbTintColor={colors.accent}
         />
-        <View style={styles.progressLabels}>
-          <Text style={styles.progressTime}>{formatTime(shownPosition)}</Text>
-          <Text style={styles.progressTime}>{formatTime(totalMillis)}</Text>
+        <View style={s.progressLabels}>
+          <Text style={s.progressTime}>{formatMillis(shownPosition)}</Text>
+          <Text style={s.progressTime}>{isBuffering ? "buffering…" : formatMillis(totalMillis)}</Text>
         </View>
       </View>
 
-      <View style={styles.controlsRow}>
-        <TouchableOpacity onPress={toggleShuffle} style={{ padding: 8 }} hitSlop={4}>
-          <ShuffleIcon size={20} color={shuffle ? colors.accent : colors.muted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={prev} style={{ padding: 8 }} hitSlop={4}>
-          <SkipBackIcon size={24} color={colors.ink} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={togglePlayPause} style={[styles.playBtn, nbShadow]}>
-          {isPlaying ? <PauseIcon size={28} color={colors.white} /> : <PlayIcon size={28} color={colors.white} />}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={next} style={{ padding: 8 }} hitSlop={4}>
-          <SkipForwardIcon size={24} color={colors.ink} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={cycleRepeat} style={{ padding: 8 }} hitSlop={4}>
-          <RepeatIcon size={20} color={repeatMode !== "off" ? colors.accent : colors.muted} />
-          {repeatMode === "one" && <View style={styles.repeatOneDot} />}
-        </TouchableOpacity>
+      <View style={s.controlsRow}>
+        <IconButton label="Shuffle" icon={<ShuffleIcon size={20} color={shuffle ? colors.accent : colors.faint} />} onPress={toggleShuffle} />
+        <IconButton label="Previous" size={44} icon={<SkipBackIcon size={24} color={colors.ink} />} onPress={prev} />
+        <IconButton
+          label={isPlaying ? "Pause" : "Play"}
+          size={68}
+          variant="accent"
+          icon={isPlaying ? <PauseIcon size={26} color={colors.onAccent} /> : <PlayIcon size={26} color={colors.onAccent} />}
+          onPress={togglePlayPause}
+        />
+        <IconButton label="Next" size={44} icon={<SkipForwardIcon size={24} color={colors.ink} />} onPress={next} />
+        <IconButton
+          label="Repeat"
+          icon={repeatMode === "one" ? <RepeatOneIcon size={20} color={repeatColor} /> : <RepeatIcon size={20} color={repeatColor} />}
+          onPress={cycleRepeat}
+        />
       </View>
 
-      {onQueue && (
-        <TouchableOpacity onPress={onQueue} style={styles.upNextBar} activeOpacity={0.7}>
-          <QueueIcon size={16} color={colors.ink} />
-          <Text style={styles.upNextLabel}>
-            {upNext.length > 0 ? `Up next: ${upNext[0].title}` : "Queue is empty"}
-          </Text>
+      <View style={s.utilRow}>
+        <TouchableOpacity onPress={onLyrics} style={s.utilBtn} activeOpacity={0.7}>
+          <LyricsIcon size={15} color={colors.ink} />
+          <Text style={s.utilLabel}>Lyrics</Text>
         </TouchableOpacity>
-      )}
+        {onQueue && (
+          <TouchableOpacity onPress={onQueue} style={s.utilBtnFlex} activeOpacity={0.7}>
+            <QueueIcon size={15} color={colors.ink} />
+            <Text style={s.utilLabel} numberOfLines={1}>
+              {upNext.length > 0 ? `Up next: ${upNext[0].title}` : "Queue is empty"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ActionSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={currentTrack.title} subtitle={currentTrack.album} options={menuOptions} />
 
       <ActionSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={currentTrack.title}
-        subtitle={currentTrack.album}
-        options={[
-          {
-            label: "Add to playlist",
-            icon: <PlusCircleIcon size={18} color={colors.ink} />,
-            onPress: () => Alert.alert("Added", `"${currentTrack.title}" was added to Liked Songs.`),
-          },
-          ...(onQueue
-            ? [
-                {
-                  label: "View queue",
-                  icon: <QueueIcon size={18} color={colors.ink} />,
-                  onPress: onQueue,
-                },
-              ]
-            : []),
-          {
-            label: "Share track",
-            icon: <ShareIcon size={18} color={colors.ink} />,
-            onPress: () => Alert.alert("Share", `Share link for "${currentTrack.title}" copied.`),
-          },
-        ]}
+        visible={speedSheet}
+        onClose={() => setSpeedSheet(false)}
+        title="Playback speed"
+        options={SPEEDS.map((sp) => ({
+          label: `${sp}×${sp === 1 ? " (normal)" : ""}`,
+          icon: sp === playbackRate ? <CheckIcon size={16} color={colors.accent} /> : undefined,
+          onPress: () => setPlaybackRate(sp),
+        }))}
       />
+
+      <ActionSheet
+        visible={sleepSheet}
+        onClose={() => setSleepSheet(false)}
+        title="Sleep timer"
+        subtitle={sleep?.kind === "time" ? `Pauses at ${new Date(sleep.endsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : undefined}
+        options={SLEEP_OPTIONS.map((opt) => ({
+          label: opt.label,
+          icon: (opt.value === null && !sleep) || (opt.value === "track" && sleep?.kind === "track") ? <CheckIcon size={16} color={colors.accent} /> : undefined,
+          onPress: () => setSleepTimer(opt.value),
+        }))}
+      />
+
+      <TrackActionsSheet visible={trackActions} track={currentTrack} onClose={() => setTrackActions(false)} />
     </View>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.ground },
-    topBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 2,
-      borderBottomColor: colors.ink,
-    },
-    iconBtn: { padding: 4 },
-    topBarTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink, letterSpacing: 0.3 },
-    artworkWrap: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
-    artwork: { width: "100%", aspectRatio: 1, borderWidth: 2, borderColor: colors.ink, overflow: "hidden" },
-    artworkImage: { width: "100%", height: "100%", resizeMode: "cover" },
-    trackInfoRow: { paddingHorizontal: 24, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-    trackTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 24, letterSpacing: -0.6, color: colors.ink },
-    trackArtist: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 4 },
-    progressWrap: { paddingHorizontal: 24, paddingTop: 12 },
-    progressLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
-    progressTime: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
-    controlsRow: {
-      paddingHorizontal: 24,
-      paddingTop: 16,
-      paddingBottom: 16,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    playBtn: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    repeatOneDot: {
-      position: "absolute",
-      top: 4,
-      right: 4,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.accent,
-    },
-    upNextBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginHorizontal: 24,
-      marginBottom: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      backgroundColor: colors.surface,
-    },
-    upNextLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink, flexShrink: 1 },
-  });
-}
+const makeStyles = ({ colors, shadows }: ThemeContextValue) => ({
+  container: { flex: 1, backgroundColor: colors.bg },
+  topBar: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 12, height: 54 },
+  topBarTitle: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.muted, letterSpacing: 0.4, textTransform: "uppercase" as const },
+  artworkWrap: { paddingHorizontal: 28, paddingTop: 12, paddingBottom: 20 },
+  trackInfoRow: { paddingHorizontal: 26, flexDirection: "row" as const, alignItems: "flex-start" as const, justifyContent: "space-between" as const },
+  trackTitle: { fontFamily: fonts.display, fontSize: 22, lineHeight: 25, letterSpacing: -0.5, color: colors.ink },
+  trackArtist: { fontFamily: fonts.bodyMedium, fontSize: 14.5, color: colors.muted, marginTop: 4 },
+  progressWrap: { paddingHorizontal: 22, paddingTop: 14 },
+  progressLabels: { flexDirection: "row" as const, justifyContent: "space-between" as const, marginTop: 2, paddingHorizontal: 4 },
+  progressTime: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
+  controlsRow: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const },
+  utilRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10, marginHorizontal: 26, marginTop: 14, marginBottom: 18 },
+  utilBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: stroke.base,
+    borderColor: colors.outline,
+    backgroundColor: colors.surfaceAlt,
+    ...shadows.sm,
+  },
+  utilBtnFlex: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: stroke.base,
+    borderColor: colors.outline,
+    backgroundColor: colors.surfaceAlt,
+    ...shadows.sm,
+  },
+  utilLabel: { fontFamily: fonts.bodyBold, fontSize: 12.5, color: colors.ink, flexShrink: 1 },
+});

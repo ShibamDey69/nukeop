@@ -1,120 +1,118 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList } from "react-native";
-import { ARTISTS, ALBUMS, TRACKS } from "../data";
+import React, { useMemo, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import type { Track } from "../data";
+import { Header, EmptyState, PressableScale, Button } from "../ui";
+import { Artwork } from "../widgets/Artwork";
 import { TrackRow } from "../widgets/TrackRow";
+import { TrackActionsSheet } from "../widgets/TrackActionsSheet";
+import { ShuffleIcon, PlayIcon } from "../icons";
+import { fonts, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
 import { usePlayer } from "../player/PlayerContext";
 import { useAppNavigation } from "../navigation/NavigationContext";
-import { PlayIcon } from "../icons";
-import { useTheme, fonts, ThemeColors } from "../theme";
+import { albumsForArtist, deriveArtists, library, tracksForArtist, useLibrary } from "../library";
+import { plural } from "../format";
 
-export default function ArtistDetailScreen({ artistId }: { artistId: string }) {
-  const { colors, nbShadow } = useTheme();
-  const styles = makeStyles(colors);
-  const artist = ARTISTS.find((a) => a.id === artistId);
-  const { push } = useAppNavigation();
-  const { currentTrack, isPlaying, playTrack, playQueue, isLiked, toggleLike } = usePlayer();
+interface ArtistDetailScreenProps {
+  artistId: string;
+  onGoToAlbum: (id: string) => void;
+}
 
-  if (!artist) return null;
+export default function ArtistDetailScreen({ artistId, onGoToAlbum }: ArtistDetailScreenProps) {
+  const { colors } = useTheme();
+  const s = useThemedStyles(makeStyles);
+  const { currentTrack, isPlaying, playQueue, playTrack } = usePlayer();
+  const { isLiked, allTracks } = useLibrary();
+  const { pop } = useAppNavigation();
+  const [menuTrack, setMenuTrack] = useState<Track | null>(null);
 
-  const albums = ALBUMS.filter((al) => al.artistId === artistId);
-  const tracks = TRACKS.filter((t) => t.artistId === artistId);
+  const artist = useMemo(() => deriveArtists(allTracks).find((a) => a.id === artistId), [allTracks, artistId]);
+
+  if (!artist) {
+    return (
+      <View style={{ flex: 1 }}>
+        <Header title="Artist" onBack={pop} />
+        <EmptyState title="Artist not found" />
+      </View>
+    );
+  }
+
+  const albums = albumsForArtist(artistId, allTracks);
+  const tracks = tracksForArtist(artistId, allTracks);
 
   return (
-    <FlatList
-      data={tracks}
-      keyExtractor={(t) => t.id}
-      ListHeaderComponent={
-        <View>
-          <View style={styles.header}>
-            <Image source={{ uri: artist.image }} style={[styles.avatar, nbShadow]} />
-            <Text style={styles.name}>{artist.name}</Text>
-            <Text style={styles.meta}>{artist.albumCount} albums</Text>
-            <TouchableOpacity
-              style={[styles.playAllBtn, nbShadow]}
-              onPress={() => tracks.length > 0 && playQueue(tracks, 0)}
-              activeOpacity={0.85}
-            >
-              <PlayIcon size={16} color={colors.white} />
-              <Text style={styles.playAllLabel}>Play all</Text>
-            </TouchableOpacity>
-          </View>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <Header title="" onBack={pop} />
 
-          {albums.length > 0 && (
-            <View style={styles.albumsSection}>
-              <Text style={styles.sectionLabel}>Albums</Text>
-              <FlatList
-                data={albums}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(al) => al.id}
-                contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
-                renderItem={({ item: album }) => (
-                  <TouchableOpacity
-                    style={styles.albumCard}
-                    onPress={() => push({ screen: "album", id: album.id })}
-                    activeOpacity={0.75}
-                  >
-                    <Image source={{ uri: album.image }} style={styles.albumArt} />
-                    <Text style={styles.albumTitle} numberOfLines={1}>
-                      {album.title}
-                    </Text>
-                    <Text style={styles.albumYear}>{album.year}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
+      <View style={s.hero}>
+        <Artwork uri={artist.image} seed={artist.id} circle size={112} style={{ alignSelf: "center" }} />
+        <Text style={s.name}>{artist.name}</Text>
+        <Text style={s.meta}>
+          {plural(albums.length, "album")} · {plural(tracks.length, "track")}
+        </Text>
 
-          <Text style={[styles.sectionLabel, { paddingHorizontal: 16, marginTop: 20 }]}>Popular tracks</Text>
+        <View style={s.actionsRow}>
+          <Button
+            label="Play"
+            icon={<PlayIcon size={15} color={colors.onAccent} />}
+            onPress={() => playQueue(tracks, 0)}
+            disabled={tracks.length === 0}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label="Shuffle"
+            variant="secondary"
+            icon={<ShuffleIcon size={15} color={colors.ink} />}
+            onPress={() => playQueue(tracks, 0, { shuffle: true })}
+            disabled={tracks.length === 0}
+            style={{ flex: 1 }}
+          />
         </View>
-      }
-      renderItem={({ item: track, index }) => (
+      </View>
+
+      {albums.length > 0 && (
+        <>
+          <Text style={s.sectionLabel}>Albums</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.albumRow}>
+            {albums.map((album) => (
+              <PressableScale key={album.id} style={s.albumItem} scaleTo={0.96} onPress={() => onGoToAlbum(album.id)}>
+                <Artwork uri={album.image} seed={album.id} size={120} />
+                <Text style={s.albumTitle} numberOfLines={1}>
+                  {album.title}
+                </Text>
+              </PressableScale>
+            ))}
+          </ScrollView>
+        </>
+      )}
+
+      <Text style={s.sectionLabel}>All tracks</Text>
+      {tracks.map((track, i) => (
         <TrackRow
+          key={track.id}
           track={track}
-          index={index}
+          index={i}
           isActive={currentTrack?.id === track.id}
           isPlaying={isPlaying}
           liked={isLiked(track.id)}
-          onToggleLike={() => toggleLike(track.id)}
+          onToggleLike={() => library.toggleLike(track)}
           onPress={() => playTrack(track, tracks)}
+          onMore={() => setMenuTrack(track)}
         />
-      )}
-      contentContainerStyle={{ paddingBottom: 24 }}
-    />
+      ))}
+
+      <TrackActionsSheet visible={!!menuTrack} track={menuTrack} onClose={() => setMenuTrack(null)} onGoToAlbum={onGoToAlbum} />
+    </ScrollView>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    header: { alignItems: "center", paddingTop: 24, paddingBottom: 8 },
-    avatar: { width: 120, height: 120, borderWidth: 2, borderColor: colors.ink, borderRadius: 60 },
-    name: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.6, color: colors.ink, marginTop: 14 },
-    meta: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 2 },
-    playAllBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      backgroundColor: colors.accent,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      marginTop: 16,
-    },
-    playAllLabel: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.white },
-    albumsSection: { marginTop: 24 },
-    sectionLabel: {
-      fontFamily: fonts.display,
-      fontSize: 13,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-      color: colors.ink,
-      marginBottom: 10,
-      paddingHorizontal: 16,
-    },
-    albumCard: { width: 110 },
-    albumArt: { width: 110, height: 110, borderWidth: 2, borderColor: colors.ink },
-    albumTitle: { fontFamily: fonts.displayBold, fontSize: 12, color: colors.ink, marginTop: 6 },
-    albumYear: { fontFamily: fonts.body, fontSize: 10, color: colors.muted },
-  });
-}
+const makeStyles = ({ colors }: ThemeContextValue) => ({
+  hero: { alignItems: "center" as const, paddingHorizontal: 24, paddingTop: 4, paddingBottom: 22 },
+  name: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.5, color: colors.ink, marginTop: 14, textAlign: "center" as const },
+  meta: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 4 },
+  actionsRow: { flexDirection: "row" as const, gap: 10, marginTop: 18, alignSelf: "stretch" as const },
+  sectionLabel: { fontFamily: fonts.displaySemi, fontSize: 16, color: colors.ink, paddingHorizontal: 20, marginBottom: 10, marginTop: 6 },
+  albumRow: { paddingHorizontal: 20, gap: 14, paddingBottom: 8 },
+  albumItem: { width: 120 },
+  albumTitle: { fontFamily: fonts.bodySemibold, fontSize: 12.5, color: colors.ink, marginTop: 8 },
+  albumYear: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 1 },
+});

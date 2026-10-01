@@ -1,176 +1,192 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import React, { useMemo } from "react";
+import { FlatList, Text, View } from "react-native";
+import { Header, EmptyState, IconButton, PressableScale } from "../ui";
+import { TrackRow } from "../widgets/TrackRow";
+import { EqBars, Artwork } from "../widgets/Artwork";
 import { usePlayer } from "../player/PlayerContext";
-import { TopBar } from "../components";
-import { PlayIcon, PauseIcon, ChevronUpIcon, ChevronDownIcon, TrashIcon } from "../icons";
-import { useTheme, fonts, ThemeColors } from "../theme";
+import { useLibrary } from "../library";
+import { fonts, radius, stroke, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
+import { formatDuration } from "../format";
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon, QueueIcon, ShuffleIcon, TrashIcon } from "../icons";
+import { Track } from "../data";
 
 interface QueueScreenProps {
   onBack: () => void;
 }
 
+interface Row {
+  key: string;
+  track: Track;
+  queueIndex: number;
+}
+
+const MAX_RECOMMENDATIONS = 12;
+
 export default function QueueScreen({ onBack }: QueueScreenProps) {
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const {
-    currentTrack,
-    isPlaying,
-    queue,
-    index,
-    togglePlayPause,
-    jumpToQueueIndex,
-    removeFromQueue,
-    reorderQueue,
-    clearUpNext,
-  } = usePlayer();
+  const s = useThemedStyles(makeStyles);
+  const { currentTrack, index, shuffle, upNext, jumpToQueueIndex, removeFromQueue, reorderQueue, clearUpNext, toggleShuffle, playTrack, addToQueue } = usePlayer();
+  const { isLiked, likedTracks, recentTracks, allTracks } = useLibrary();
 
-  // upNext[i] lives at queue[offset + i] in the real, underlying queue.
-  const offset = index + 1;
-  const upNext = index >= 0 ? queue.slice(offset) : queue;
+  const rows: Row[] = upNext.map((track, i) => ({ key: `${track.id}-${index + 1 + i}`, track, queueIndex: index + 1 + i }));
+
+  // Nothing queued up — surface real recommendations instead of a blank
+  // screen: liked songs first, then recently played, then whatever's left
+  // in the library. Never fabricated content.
+  const recommended = useMemo(() => {
+    if (rows.length > 0) return [];
+    const seen = new Set<string>(currentTrack ? [currentTrack.id] : []);
+    const out: Track[] = [];
+    for (const t of [...likedTracks, ...recentTracks, ...allTracks]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      out.push(t);
+      if (out.length >= MAX_RECOMMENDATIONS) break;
+    }
+    return out;
+  }, [rows.length, currentTrack, likedTracks, recentTracks, allTracks]);
+
+  function onRecommendedPress(track: Track, pool: Track[]) {
+    if (currentTrack) addToQueue(track);
+    else playTrack(track, pool);
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <TopBar title="Queue" onBack={onBack} />
+    <View style={{ flex: 1 }}>
+      <Header
+        title="Queue"
+        onBack={onBack}
+        right={
+          upNext.length > 0 ? (
+            <IconButton label="Clear queue" variant="solid" icon={<TrashIcon size={16} color={colors.ink} />} onPress={clearUpNext} />
+          ) : undefined
+        }
+      />
 
       {currentTrack && (
-        <View style={styles.nowPlayingCard}>
-          <Text style={styles.sectionLabel}>Now playing</Text>
-          <View style={styles.nowPlayingRow}>
-            <Image source={{ uri: currentTrack.image }} style={styles.art} />
+        <View style={s.nowSection}>
+          <Text style={s.sectionLabel}>Now playing</Text>
+          <View style={s.nowRow}>
+            <Artwork uri={currentTrack.image} seed={currentTrack.albumId || currentTrack.id} size={48} radius={11} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.title} numberOfLines={1}>
+              <Text style={s.nowTitle} numberOfLines={1}>
                 {currentTrack.title}
               </Text>
-              <Text style={styles.artist} numberOfLines={1}>
+              <Text style={s.nowArtist} numberOfLines={1}>
                 {currentTrack.artist}
               </Text>
             </View>
-            <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtn} hitSlop={8}>
-              {isPlaying ? <PauseIcon size={18} color={colors.white} /> : <PlayIcon size={18} color={colors.white} />}
-            </TouchableOpacity>
+            <EqBars color={colors.accent} playing height={16} />
           </View>
         </View>
       )}
 
-      <View style={styles.upNextHeader}>
-        <Text style={styles.sectionLabel}>Up next · {upNext.length}</Text>
-        {upNext.length > 0 && (
-          <TouchableOpacity onPress={clearUpNext} hitSlop={6}>
-            <Text style={styles.clearLabel}>Clear</Text>
-          </TouchableOpacity>
-        )}
+      <View style={s.upNextHeader}>
+        <Text style={s.sectionLabel}>{shuffle ? "Up next · shuffled" : "Up next"}</Text>
+        <PressableScale onPress={toggleShuffle} style={[s.shuffleChip, shuffle && s.shuffleChipActive]} scaleTo={0.95}>
+          <ShuffleIcon size={13} color={shuffle ? colors.onAccent : colors.ink} />
+          <Text style={[s.shuffleChipLabel, shuffle && { color: colors.onAccent }]}>Shuffle</Text>
+        </PressableScale>
       </View>
 
       <FlatList
-        data={upNext}
-        keyExtractor={(item, i) => `${item.id}-${i}`}
+        data={rows}
+        keyExtractor={(item) => item.key}
+        contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            Nothing queued yet — use "Play next" or "Add to queue" from any track's menu.
-          </Text>
-        }
-        contentContainerStyle={{ paddingBottom: 24 }}
-        renderItem={({ item: track, index: i }) => {
-          const realIndex = offset + i;
-          return (
-            <View style={styles.row}>
-              <View style={styles.reorderCol}>
-                <TouchableOpacity
-                  disabled={i === 0}
-                  onPress={() => reorderQueue(realIndex, realIndex - 1)}
-                  hitSlop={4}
-                  style={{ opacity: i === 0 ? 0.3 : 1 }}
-                >
-                  <ChevronUpIcon size={14} color={colors.ink} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={i === upNext.length - 1}
-                  onPress={() => reorderQueue(realIndex, realIndex + 1)}
-                  hitSlop={4}
-                  style={{ opacity: i === upNext.length - 1 ? 0.3 : 1 }}
-                >
-                  <ChevronDownIcon size={14} color={colors.ink} />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.rowInfo}
-                activeOpacity={0.7}
-                onPress={() => jumpToQueueIndex(realIndex)}
-              >
-                <Image source={{ uri: track.image }} style={styles.rowArt} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {track.title}
-                  </Text>
-                  <Text style={styles.rowArtist} numberOfLines={1}>
-                    {track.artist}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => removeFromQueue(realIndex)} hitSlop={8} style={{ padding: 6 }}>
-                <TrashIcon size={16} color={colors.muted} />
-              </TouchableOpacity>
+          recommended.length > 0 ? (
+            <View style={{ paddingTop: 4 }}>
+              <Text style={[s.sectionLabel, { paddingHorizontal: 20, marginBottom: 8 }]}>
+                {likedTracks.length > 0 || recentTracks.length > 0 ? "Recommended for you" : "From your library"}
+              </Text>
+              {recommended.map((track, i) => (
+                <TrackRow
+                  key={track.id}
+                  track={track}
+                  index={i}
+                  liked={isLiked(track.id)}
+                  onPress={() => onRecommendedPress(track, recommended)}
+                  onAddToQueue={() => addToQueue(track)}
+                />
+              ))}
             </View>
-          );
-        }}
+          ) : (
+            <EmptyState
+              icon={<QueueIcon size={22} color={colors.accent} />}
+              title="Queue is empty"
+              message="Scan your device for music, or search, to start building a queue."
+            />
+          )
+        }
+        renderItem={({ item, index: rowIndex }) => (
+          <PressableScale onPress={() => jumpToQueueIndex(item.queueIndex)} scaleTo={0.99} style={s.row}>
+            <Artwork uri={item.track.image} seed={item.track.albumId || item.track.id} size={42} radius={10} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={s.rowTitle} numberOfLines={1}>
+                {item.track.title}
+              </Text>
+              <Text style={s.rowArtist} numberOfLines={1}>
+                {item.track.artist}
+              </Text>
+            </View>
+            <Text style={s.rowDuration}>{formatDuration(item.track.duration)}</Text>
+            <View style={s.reorderCol}>
+              <IconButton
+                label="Move up"
+                size={22}
+                disabled={rowIndex === 0}
+                icon={<ChevronUpIcon size={14} color={rowIndex === 0 ? colors.faint : colors.ink} />}
+                onPress={() => reorderQueue(item.queueIndex, item.queueIndex - 1)}
+              />
+              <IconButton
+                label="Move down"
+                size={22}
+                disabled={rowIndex === rows.length - 1}
+                icon={<ChevronDownIcon size={14} color={rowIndex === rows.length - 1 ? colors.faint : colors.ink} />}
+                onPress={() => reorderQueue(item.queueIndex, item.queueIndex + 1)}
+              />
+            </View>
+            <IconButton label="Remove from queue" size={30} icon={<CloseIcon size={15} color={colors.faint} />} onPress={() => removeFromQueue(item.queueIndex)} />
+          </PressableScale>
+        )}
       />
     </View>
   );
 }
 
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    sectionLabel: {
-      fontFamily: fonts.display,
-      fontSize: 12,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-      color: colors.muted,
-    },
-    nowPlayingCard: {
-      margin: 16,
-      marginBottom: 8,
-      padding: 12,
-      borderWidth: 2,
-      borderColor: colors.ink,
-      backgroundColor: colors.surface,
-    },
-    nowPlayingRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 },
-    art: { width: 48, height: 48, borderWidth: 2, borderColor: colors.ink },
-    title: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.ink },
-    artist: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 2 },
-    playPauseBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    upNextHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 8,
-    },
-    clearLabel: { fontFamily: fonts.bodySemibold, fontSize: 12, color: colors.accent },
-    emptyText: {
-      fontFamily: fonts.body,
-      fontSize: 13,
-      color: colors.muted,
-      textAlign: "center",
-      paddingHorizontal: 32,
-      paddingTop: 24,
-    },
-    row: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
-    reorderCol: { width: 20, alignItems: "center", gap: 2 },
-    rowInfo: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
-    rowArt: { width: 36, height: 36, borderWidth: 2, borderColor: colors.ink },
-    rowTitle: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-    rowArtist: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 1 },
-  });
-}
+const makeStyles = ({ colors, shadows }: ThemeContextValue) => ({
+  sectionLabel: { fontFamily: fonts.bodyBold, fontSize: 12, letterSpacing: 0.7, textTransform: "uppercase" as const, color: colors.muted },
+  nowSection: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, gap: 10 },
+  nowRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    borderWidth: stroke.base,
+    borderColor: colors.outline,
+    padding: 10,
+    ...shadows.sm,
+  },
+  nowTitle: { fontFamily: fonts.bodyBold, fontSize: 14.5, color: colors.ink },
+  nowArtist: { fontFamily: fonts.bodyMedium, fontSize: 12.5, color: colors.muted, marginTop: 1 },
+  upNextHeader: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, paddingHorizontal: 20, marginBottom: 8 },
+  shuffleChip: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: stroke.thin,
+    borderColor: colors.outline,
+    backgroundColor: colors.surfaceAlt,
+  },
+  shuffleChipActive: { backgroundColor: colors.accent },
+  shuffleChipLabel: { fontFamily: fonts.bodyBold, fontSize: 11.5, color: colors.ink },
+  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, paddingHorizontal: 20, paddingVertical: 7 },
+  reorderCol: { gap: 1 },
+  rowTitle: { fontFamily: fonts.bodySemibold, fontSize: 14, color: colors.ink },
+  rowArtist: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted, marginTop: 1 },
+  rowDuration: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.faint },
+});

@@ -1,16 +1,11 @@
-import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import React from "react";
+import { Text, View, ViewStyle } from "react-native";
 import { Track } from "../data";
-import { EqualizerIcon, HeartIcon, PlayIcon, QueueIcon } from "../icons";
-import { useTheme, fonts, ThemeColors } from "../theme";
-import { usePlayer } from "../player/PlayerContext";
-import { ActionSheet } from "./ActionSheet";
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { EqualizerIcon, HeartIcon, ListPlusIcon, MoreVertIcon } from "../icons";
+import { fonts, ThemeContextValue, useTheme, useThemedStyles } from "../theme";
+import { formatDuration } from "../format";
+import { Artwork } from "./Artwork";
+import { IconButton, PressableScale } from "../ui";
 
 interface TrackRowProps {
   track: Track;
@@ -18,100 +13,78 @@ interface TrackRowProps {
   isActive?: boolean;
   isPlaying?: boolean;
   liked?: boolean;
+  compact?: boolean;
+  showArt?: boolean;
   onPress: () => void;
   onToggleLike?: () => void;
-  showArt?: boolean;
+  onMore?: () => void;
+  /** Shows a dedicated one-tap "Add to queue" button (used in Search, where queueing without opening the full action sheet matters most). */
+  onAddToQueue?: () => void;
+  style?: ViewStyle;
 }
 
-export function TrackRow({
-  track,
-  index,
-  isActive = false,
-  isPlaying = false,
-  liked = false,
-  onPress,
-  onToggleLike,
-  showArt = true,
-}: TrackRowProps) {
+const makeStyles = ({ colors }: ThemeContextValue) => ({
+  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 12, paddingHorizontal: 20, paddingVertical: 9 },
+  rowCompact: { paddingVertical: 6 },
+  leading: { width: 22, alignItems: "center" as const },
+  index: { fontFamily: fonts.mono, fontSize: 12.5, color: colors.faint },
+  title: { fontFamily: fonts.bodySemibold, fontSize: 14.5, color: colors.ink },
+  artist: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 1 },
+  duration: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.faint },
+});
+
+export function TrackRow({ track, index, isActive, isPlaying, liked, compact, showArt = true, onPress, onToggleLike, onMore, onAddToQueue, style }: TrackRowProps) {
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
-  const { playNext, addToQueue } = usePlayer();
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const s = useThemedStyles(makeStyles);
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.row}
-        onPress={onPress}
-        onLongPress={() => setSheetOpen(true)}
-        activeOpacity={0.65}
-      >
-        <View style={styles.leading}>
-          {isActive && isPlaying ? (
-            <EqualizerIcon size={16} color={colors.accent} />
-          ) : index !== undefined ? (
-            <Text style={styles.index}>{index + 1}</Text>
-          ) : null}
+    <PressableScale
+      onPress={onPress}
+      onLongPress={onMore}
+      scaleTo={0.985}
+      style={[s.row, compact && s.rowCompact, style]}
+      accessibilityLabel={`${track.title} by ${track.artist}`}
+    >
+      {index !== undefined && (
+        <View style={s.leading}>
+          {isActive && isPlaying ? <EqualizerIcon size={15} color={colors.accent} /> : <Text style={s.index}>{index + 1}</Text>}
         </View>
+      )}
 
-        {showArt && <Image source={{ uri: track.image }} style={styles.art} />}
+      {showArt && <Artwork uri={track.image} seed={track.albumId || track.id} size={compact ? 38 : 44} radius={9} />}
 
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={[styles.title, isActive && { color: colors.accent }]}
-            numberOfLines={1}
-          >
-            {track.title}
-          </Text>
-          <Text style={styles.artist} numberOfLines={1}>
-            {track.artist}
-          </Text>
-        </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[s.title, isActive && { color: colors.accent }]} numberOfLines={1}>
+          {track.title}
+        </Text>
+        <Text style={s.artist} numberOfLines={1}>
+          {track.artist}
+        </Text>
+      </View>
 
-        {onToggleLike && (
-          <TouchableOpacity onPress={onToggleLike} hitSlop={8} style={{ padding: 4 }}>
-            <HeartIcon size={16} color={liked ? colors.accent : colors.muted} filled={liked} />
-          </TouchableOpacity>
-        )}
+      {onToggleLike && (
+        <IconButton
+          label={liked ? "Unlike" : "Like"}
+          size={30}
+          icon={<HeartIcon size={16} color={liked ? colors.accent : colors.faint} filled={liked} />}
+          onPress={onToggleLike}
+        />
+      )}
 
-        <Text style={styles.duration}>{formatDuration(track.duration)}</Text>
-      </TouchableOpacity>
+      <Text style={s.duration}>{formatDuration(track.duration)}</Text>
 
-      <ActionSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={track.title}
-        subtitle={track.artist}
-        options={[
-          {
-            label: "Play now",
-            icon: <PlayIcon size={16} color={colors.ink} />,
-            onPress,
-          },
-          {
-            label: "Play next",
-            icon: <QueueIcon size={16} color={colors.ink} />,
-            onPress: () => playNext(track),
-          },
-          {
-            label: "Add to queue",
-            icon: <QueueIcon size={16} color={colors.ink} />,
-            onPress: () => addToQueue(track),
-          },
-        ]}
-      />
-    </>
+      {onAddToQueue && (
+        <IconButton
+          label="Add to queue"
+          size={30}
+          icon={<ListPlusIcon size={17} color={colors.faint} />}
+          onPress={onAddToQueue}
+        />
+      )}
+
+      {onMore && (
+        <IconButton label="More options" size={30} icon={<MoreVertIcon size={17} color={colors.faint} />} onPress={onMore} />
+      )}
+    </PressableScale>
   );
-}
-
-function makeStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    row: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 16 },
-    leading: { width: 20, alignItems: "center" },
-    index: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted },
-    art: { width: 40, height: 40, borderWidth: 2, borderColor: colors.ink },
-    title: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.ink },
-    artist: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 1 },
-    duration: { fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
-  });
 }
